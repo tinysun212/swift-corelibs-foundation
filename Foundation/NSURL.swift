@@ -302,10 +302,17 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
         
         let thePath = _standardizedPath(path)
         if thePath.length > 0 {
-            
+#if CAN_IMPORT_MINGWCRT
+            _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLWindowsPathStyle, isDir, baseURL?._cfObject)
+#else
             _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLPOSIXPathStyle, isDir, baseURL?._cfObject)
+#endif
         } else if let baseURL = baseURL {
+#if CAN_IMPORT_MINGWCRT
+            _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, baseURL.path._cfObject, kCFURLWindowsPathStyle, baseURL.hasDirectoryPath, nil)
+#else
             _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, baseURL.path._cfObject, kCFURLPOSIXPathStyle, baseURL.hasDirectoryPath, nil)
+#endif
         }
     }
     
@@ -352,7 +359,11 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
             }
         }
         super.init()
+#if CAN_IMPORT_MINGWCRT
+        _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLWindowsPathStyle, isDir, nil)
+#else
         _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLPOSIXPathStyle, isDir, nil)
+#endif
     }
     
     public convenience init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory isDir: Bool, relativeTo baseURL: URL?) {
@@ -522,7 +533,7 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
     
     open var path: String? {
         let absURL = CFURLCopyAbsoluteURL(_cfObject)
-#if os(Windows)
+#if CAN_IMPORT_MINGWCRT
         return CFURLCopyFileSystemPath(absURL, kCFURLWindowsPathStyle)?._swiftObject
 #else
         return CFURLCopyFileSystemPath(absURL, kCFURLPOSIXPathStyle)?._swiftObject
@@ -543,7 +554,11 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
     
     // The same as path if baseURL is nil
     open var relativePath: String? {
+#if CAN_IMPORT_MINGWCRT
+        return CFURLCopyFileSystemPath(_cfObject, kCFURLWindowsPathStyle)?._swiftObject
+#else
         return CFURLCopyFileSystemPath(_cfObject, kCFURLPOSIXPathStyle)?._swiftObject
+#endif
     }
     
     /* Determines if a given URL string's path represents a directory (i.e. the path component in the URL string ends with a '/' character). This does not check the resource the URL refers to.
