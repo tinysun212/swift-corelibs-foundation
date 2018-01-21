@@ -28,6 +28,15 @@
 #include <WinIoCtl.h>
 
 #define getcwd _NS_getcwd
+#define close _close
+#define write _write
+#define read _read
+#define open _NS_open
+#define stat _NS_stat
+#define fstat _fstat
+#define mkdir(a,b) _NS_mkdir(a)
+#define rmdir _NS_rmdir
+#define unlink _NS_unlink
 
 #endif
 
@@ -1373,7 +1382,7 @@ int _CFOpenFileWithMode(const char *path, int opts, mode_t mode) {
     return open(path, opts, mode);
 }
 int _CFOpenFile(const char *path, int opts) {
-    return open(path, opts);
+    return open(path, opts, 0);
 }
 
 void *_CFReallocf(void *ptr, size_t size) {

@@ -121,7 +121,16 @@ CF_INLINE void __CFUniCharCharacterSetPath(wchar_t *wpath) {
     wchar_t frameworkPath[MAXPATHLEN];
     _CFGetFrameworkPath(frameworkPath, MAXPATHLEN);
     wcsncpy(wpath, frameworkPath, MAXPATHLEN);
+#if DEPLOYMENT_RUNTIME_SWIFT
+    wcsncat(wpath, L"\\CharacterSets\\", MAXPATHLEN - wcslen(wpath));
+#else
+    /*
+        CoreFoundation.resources used only in builds of CoreFoundation.dll with iTunes for Windows
+        For Swift, it's best to use a Linux-style directory path for character sets
+
+    */
     wcsncat(wpath, L"\\CoreFoundation.resources\\", MAXPATHLEN - wcslen(wpath));
+#endif
 #else
     strlcpy(cpath, __kCFCharacterSetDir, MAXPATHLEN);
     strlcat(cpath, "/CharacterSets/", MAXPATHLEN);
