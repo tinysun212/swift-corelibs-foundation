@@ -33,7 +33,6 @@ internal let FilesystemPathDelimiter:Character = "/"
 
 private func _standardizedPath(_ path: String) -> String {
     if !path.absolutePath {
-        print("standardizing non absolute path \(path) \(path._nsObject.standardizingPath)")
         return path._nsObject.standardizingPath
     }
 #if os(Windows)
@@ -54,7 +53,7 @@ private func _standardizedPath(_ path: String) -> String {
     if path.hasSuffix("/") || path.hasSuffix("\\") {
         res.append("\\")
     }
-    print("standardazing absolute path \(path) \(res)")
+
     return res
 #else
     return path
