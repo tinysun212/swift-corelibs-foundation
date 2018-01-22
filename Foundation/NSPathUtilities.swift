@@ -126,7 +126,7 @@ internal extension String {
                 return true
             }
         }
-        return  hasPrefix("\\\\") || hasPrefix("~")
+        return  hasPrefix("\\\\") || hasPrefix("//")
 #else
         return hasPrefix("~") || hasPrefix("/")
 #endif
@@ -141,7 +141,7 @@ internal extension String {
             return "\\" + str
         }
         if self == "/" || self == "\\" {
-            return self + str
+            return "\\" + str
         }
         return self + "\\" + str
 #else
@@ -248,7 +248,7 @@ public extension NSString {
                 return true
             }
         }
-        return  hasPrefix("\\\\") || hasPrefix("~")
+        return  hasPrefix("\\\\") || hasPrefix("//")
 #else
         return hasPrefix("~") || hasPrefix("/")
 #endif
@@ -321,7 +321,7 @@ public extension NSString {
     internal func _stringByFixingSlashes(compress : Bool = true, stripTrailing: Bool = true) -> String {
 #if os(Windows)
         if _swiftObject == "//" || _swiftObject == "\\\\" {
-            return _swiftObject
+            return "\\\\"
         }
 #else
         if _swiftObject == "/" {
@@ -476,6 +476,7 @@ public extension NSString {
         
         var result = _swiftObject
         result.replaceSubrange(_swiftObject.startIndex..<endOfUserName, with: homeDir)
+
         result = result._stringByFixingSlashes(compress: false, stripTrailing: true)
         
         return result
