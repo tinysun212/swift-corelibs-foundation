@@ -36,25 +36,7 @@ private func _standardizedPath(_ path: String) -> String {
         return path._nsObject.standardizingPath
     }
 #if os(Windows)
-    var components = _pathComponents(path)
-
-    guard !components!.isEmpty else {
-        return path
-    }
-
-    let lastComponent = components!.last
-
-    if lastComponent == "/" || lastComponent == "\\" {
-        components!.removeLast()
-    }
-
-    var res = components!.joined(separator:"\\")
-
-    if path.hasSuffix("/") || path.hasSuffix("\\") {
-        res.append("\\")
-    }
-
-    return res
+    return _pathAsWindowsPathStyle(path)
 #else
     return path
 #endif
@@ -129,6 +111,33 @@ internal func _pathComponents(_ path: String?) -> [String]? {
     }
     return nil
 }
+
+#if os(Windows)
+internal func _pathAsWindowsPathStyle(_ path: String) -> String {
+    var components = _pathComponents(path)!
+
+    guard !components.isEmpty else {
+        return path
+    }
+
+    let lastComponent = components.removeLast()
+
+    var result = components.removeFirst()
+
+    for component in components {
+        result = result._stringByAppendingPathComponent(component)
+    }
+
+    if lastComponent == "/" || lastComponent == "\\" {
+        result.append("\\")
+
+    } else {
+        result = result._stringByAppendingPathComponent(lastComponent)
+    }
+
+    return result
+}
+#endif
 
 public struct URLResourceKey : RawRepresentable, Equatable, Hashable {
     public private(set) var rawValue: String
@@ -390,7 +399,11 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
             if let absPath = baseURL?.appendingPathComponent(path).path {
                 absolutePath = absPath
             } else {
+#if os(Windows)
+                absolutePath = path.hasPrefix("~") ? NSString(string: path).expandingTildeInPath : path._stringByFixingSlashes(compress: false, stripTrailing: true)
+#else
                 absolutePath = path
+#endif
             }
             
             let _ = FileManager.default.fileExists(atPath: absolutePath, isDirectory: &isDir)
@@ -404,31 +417,14 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
     }
 
     public init(fileURLWithPath path: String) {
-#if os(Windows)
-        var thePath: String
-#else
         let thePath: String
-#endif
+
         let pathString = NSString(string: path)
         if !pathString.isAbsolutePath {
             thePath = pathString.standardizingPath
         } else {
 #if os(Windows)
-            var components = _pathComponents(path)
-            let lastComponent = components!.last
-
-            if lastComponent == "/" || lastComponent == "\\" {
-                components!.removeLast()
-            }
-
-            if components!.isEmpty {
-                thePath = path
-            }
-            thePath = components!.joined(separator:"\\")
-
-            if path.hasSuffix("/") || path.hasSuffix("\\") {
-                thePath.append("\\")
-            }
+            thePath = _pathAsWindowsPathStyle(path)
 #else
             thePath = path
 #endif
@@ -438,9 +434,15 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
         if thePath.hasSuffix(String(FilesystemPathDelimiter)) {
             isDir = true
         } else {
+#if os(Windows)
+            if !FileManager.default.fileExists(atPath: path.hasPrefix("~") ? pathString.expandingTildeInPath : path._stringByFixingSlashes(compress: false, stripTrailing: true), isDirectory: &isDir) {
+                isDir = false
+            }
+#else
             if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
                 isDir = false
             }
+#endif
         }
         super.init()
 #if os(Windows)
