@@ -862,7 +862,7 @@ CF_EXPORT int _NS_rename(const char *oldName, const char *newName) {
 CF_EXPORT int _NS_open(const char *name, int oflag, int pmode) {
     wchar_t *wide = createWideFileSystemRepresentation(name, NULL);
     int fd;
-    _wsopen_s(&fd, wide, oflag, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+    _wsopen_s(&fd, wide, oflag | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
     free(wide);
     return fd;
 }
