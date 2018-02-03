@@ -170,7 +170,7 @@ open class FileManager : NSObject {
                         return _wmkdir(pointer) != 0
                     })
 #else
-                let mkdir_failed = mkdir(pathh, S_IRWXU | S_IRWXG | S_IRWXO) != 0
+                let mkdir_failed = mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO) != 0
 #endif
                 if mkdir_failed {
                     throw _NSErrorWithErrno(errno, reading: false, path: path)
@@ -188,7 +188,7 @@ open class FileManager : NSObject {
                         return _wmkdir(pointer) != 0
                     })
 #else
-            let mkdir_failed = mkdir(pathh, S_IRWXU | S_IRWXG | S_IRWXO) != 0
+            let mkdir_failed = mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO) != 0
 #endif
             if mkdir_failed {
                 throw _NSErrorWithErrno(errno, reading: false, path: path)
@@ -400,7 +400,7 @@ open class FileManager : NSObject {
 #elseif CAN_IMPORT_MINGWCRT
         let ti = (TimeInterval(s.st_mtime) - kCFAbsoluteTimeIntervalSince1970)
 #else
-        let ti = (TimeInterval(s.st_mtime.tv_sec) - kCFAbsoluteTimeIntervalSince1970) + (1.0e-9 * TimeInterval(s.st_mtim.tv_nsec))
+        let ti = (TimeInterval(s.st_mtim.tv_sec) - kCFAbsoluteTimeIntervalSince1970) + (1.0e-9 * TimeInterval(s.st_mtim.tv_nsec))
 #endif
         result[.modificationDate] = Date(timeIntervalSinceReferenceDate: ti)
         

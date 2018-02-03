@@ -456,7 +456,7 @@ CF_PRIVATE CFIndex __CFProcessorCount() {
     return pcnt;
 }
 
-CF_PRIVATE unsigned long long __CFMemorySize() {
+CF_PRIVATE uint64_t __CFMemorySize() {
     uint64_t memsize = 0;
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
     int32_t mib[] = {CTL_HW, HW_NCPU};

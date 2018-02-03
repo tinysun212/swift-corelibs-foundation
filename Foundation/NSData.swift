@@ -173,7 +173,7 @@ open class NSData : NSObject, NSCopying, NSMutableCopying, NSSecureCoding {
         if url.isFileURL {
             try self.init(contentsOfFile: url.path, options: readOptionsMask)
         } else {
-#if CAN_IMPORT_MINGWCRT
+#if CAN_IMPORT_MINGWCRT || os(Cygwin)
             NSUnimplemented()
 #else
             let session = URLSession(configuration: URLSessionConfiguration.default)

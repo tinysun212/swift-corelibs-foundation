@@ -438,7 +438,7 @@ open class NSIndexSet : NSObject, NSCopying, NSMutableCopying, NSSecureCoding {
         }
         
         if opts.contains(.concurrent) {
-#if CAN_IMPORT_MINGWCRT
+#if CAN_IMPORT_MINGWCRT || os(Cygwin)
             NSUnimplemented()
 #else
             DispatchQueue.concurrentPerform(iterations: Int(rangeSequence.count), execute: iteration)

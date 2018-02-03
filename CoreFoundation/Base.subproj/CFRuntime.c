@@ -1706,7 +1706,7 @@ const char *_NSPrintForDebugger(void *cf) {
     }
 }
 
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) || defined(__CYGWIN__)
 // FIXME: This fucntion was removed at https://github.com/apple/swift-corelibs-foundation/pull/1090 
 //        Until libdispatch is ported and replace this, we need this function.
 // For CF functions with 'Get' semantics, the compiler currently assumes that the result is autoreleased and must be retained. It does so on all platforms by emitting a call to objc_retainAutoreleasedReturnValue. On Darwin, this is implemented by the ObjC runtime. On Linux, there is no runtime, and therefore we have to stub it out here ourselves. The compiler will eventually call swift_release to balance the retain below. This is a workaround until the compiler no longer emits this callout on Linux.

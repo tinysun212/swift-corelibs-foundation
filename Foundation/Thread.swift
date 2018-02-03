@@ -150,11 +150,7 @@ open class Thread : NSObject {
         pthread_exit(nil)
     }
     
-#if CAN_IMPORT_MINGWCRT
     internal var _main: () -> Void = {}
-#else
-    internal var _main: (Void) -> Void = {}
-#endif
 #if os(OSX) || os(iOS) || os(Cygwin) || CAN_IMPORT_MINGWCRT
     private var _thread: pthread_t? = nil
 #elseif os(Linux) || os(Android)
