@@ -528,7 +528,7 @@ open class FileManager : NSObject {
         }
 #if CAN_IMPORT_MINGWCRT
 
-        if !srcPath.withCString(encodedAs:UTF16.self, {(srcPointer) -> Bool in 
+        if srcPath.withCString(encodedAs:UTF16.self, {(srcPointer) -> Bool in 
                 return dstPath.withCString(encodedAs:UTF16.self, {(dstPointer) -> Bool in 
                         return _wrename(srcPointer, dstPointer) != 0
                     })
