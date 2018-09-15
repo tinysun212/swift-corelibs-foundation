@@ -34,9 +34,9 @@
 
 #ifdef __APPLE_API_UNSTABLE
 __BEGIN_DECLS
-void read_random(void* buffer, u_int numBytes);
-void read_frandom(void* buffer, u_int numBytes);
-int  write_random(void* buffer, u_int numBytes);
+void read_random(void* buffer, unsigned int numBytes);
+void read_frandom(void* buffer, unsigned int numBytes);
+int  write_random(void* buffer, unsigned int numBytes);
 __END_DECLS
 #endif /* __APPLE_API_UNSTABLE */
 

@@ -166,8 +166,12 @@ public var NSCoderValueNotFoundError: Int                    { return CocoaError
 
 #if os(OSX) || os(iOS)
     import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
     import Glibc
+#elseif os(Cygwin)
+    import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+    import MinGWCrt
 #endif
 
 internal func _NSErrorWithErrno(_ posixErrno : Int32, reading : Bool, path : String? = nil, url : URL? = nil, extraUserInfo : [String : Any]? = nil) -> NSError {
@@ -181,6 +185,9 @@ internal func _NSErrorWithErrno(_ posixErrno : Int32, reading : Bool, path : Str
             default: cocoaError = CocoaError.fileReadUnknown
         }
     } else {
+#if CAN_IMPORT_MINGWCRT
+        let EDQUOT = ENOSPC
+#endif
         switch posixErrno {
             case ENOENT: cocoaError = CocoaError.fileNoSuchFile
             case EPERM, EACCES: cocoaError = CocoaError.fileWriteNoPermission

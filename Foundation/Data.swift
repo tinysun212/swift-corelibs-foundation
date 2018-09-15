@@ -21,7 +21,10 @@ import Glibc
 import CoreFoundation
     
 internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) {
+#if CAN_IMPORT_MINGWCRT
+#else
     munmap(mem, length)
+#endif
 }
     
 internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) {

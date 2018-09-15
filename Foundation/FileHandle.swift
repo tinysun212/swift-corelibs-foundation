@@ -11,8 +11,12 @@ import CoreFoundation
 
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
 import Glibc
+#elseif os(Cygwin)
+import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+import MinGWCrt
 #endif
 
 open class FileHandle : NSObject, NSSecureCoding {
@@ -39,7 +43,12 @@ open class FileHandle : NSObject, NSSecureCoding {
         if _closed || fstat(_fd, &statbuf) < 0 {
             fatalError("Unable to read file")
         }
-        if statbuf.st_mode & S_IFMT != S_IFREG {
+#if CAN_IMPORT_MINGWCRT
+        let st_mode = Int32(statbuf.st_mode)
+#else
+        let st_mode = statbuf.st_mode
+#endif
+        if st_mode & S_IFMT != S_IFREG {
             /* We get here on sockets, character special files, FIFOs ... */
             var currentAllocationSize: size_t = 1024 * 8
             dynamicBuffer = malloc(currentAllocationSize)
@@ -54,7 +63,11 @@ open class FileHandle : NSObject, NSSecureCoding {
                         fatalError("unable to allocate backing buffer")
                     }
                 }
+#if CAN_IMPORT_MINGWCRT
+                let amtRead = Int(read(_fd, dynamicBuffer!.advanced(by: total), UInt32(amountToRead)))
+#else
                 let amtRead = read(_fd, dynamicBuffer!.advanced(by: total), amountToRead)
+#endif
                 if 0 > amtRead {
                     free(dynamicBuffer)
                     fatalError("read failure")
@@ -85,7 +98,11 @@ open class FileHandle : NSObject, NSSecureCoding {
                 }
                 
                 while remaining > 0 {
+#if CAN_IMPORT_MINGWCRT
+                    let count = Int(read(_fd, dynamicBuffer!.advanced(by: total), UInt32(remaining)))
+#else
                     let count = read(_fd, dynamicBuffer!.advanced(by: total), remaining)
+#endif
                     if count < 0 {
                         free(dynamicBuffer)
                         fatalError("Unable to read from fd")

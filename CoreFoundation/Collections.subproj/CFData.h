@@ -72,6 +72,11 @@ typedef CF_OPTIONS(CFOptionFlags, CFDataSearchFlags) {
 CF_EXPORT
 CFRange CFDataFind(CFDataRef theData, CFDataRef dataToFind, CFRange searchRange, CFDataSearchFlags compareOptions) API_AVAILABLE(macos(10.6), ios(4.0), watchos(2.0), tvos(9.0));
 
+#if TARGET_OS_WINDOWS
+CF_EXPORT
+unsigned long CFPageSize();
+#endif
+
 CF_EXTERN_C_END
 CF_IMPLICIT_BRIDGING_DISABLED
 

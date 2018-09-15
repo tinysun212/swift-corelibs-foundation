@@ -13,7 +13,9 @@ import Darwin
 import Glibc
 #endif
 
+#if !os(Cygwin) && !MINGW
 import Dispatch
+#endif
 
 /**
  `Progress` is used to report the amount of work done, and provides a way to allow the user to cancel that work.
@@ -279,9 +281,11 @@ open class Progress : NSObject {
             guard let handler = cancellationHandler else { return }
             // If we're already cancelled, then invoke it - asynchronously
             if isCancelled {
+#if !os(Cygwin) && !MINGW
                 DispatchQueue.global().async {
                     handler()
                 }
+#endif
             }
         }
     }
@@ -294,9 +298,11 @@ open class Progress : NSObject {
             guard let handler = pausingHandler else { return }
             // If we're already paused, then invoke it - asynchronously
             if isPaused {
+#if !os(Cygwin) && !MINGW
                 DispatchQueue.global().async {
                     handler()
                 }
+#endif
             }
         }
     }
@@ -336,9 +342,11 @@ open class Progress : NSObject {
         isCancelled = true
         
         if let handler = cancellationHandler {
+#if !os(Cygwin) && !MINGW
             DispatchQueue.global().async {
                 handler()
             }
+#endif
         }
         
         for child in _children {
@@ -353,9 +361,11 @@ open class Progress : NSObject {
         isPaused = true
         
         if let handler = pausingHandler {
+#if !os(Cygwin) && !MINGW
             DispatchQueue.global().async {
                 handler()
             }
+#endif
         }
         
         for child in _children {
@@ -370,9 +380,11 @@ open class Progress : NSObject {
         isPaused = false
         
         if let handler = resumingHandler {
+#if !os(Cygwin) && !MINGW
             DispatchQueue.global().async {
                 handler()
             }
+#endif
         }
         
         for child in _children {

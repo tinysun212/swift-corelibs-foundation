@@ -10,8 +10,12 @@
 
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
 import Glibc
+#elseif os(Cygwin)
+import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+import MinGWCrt
 #endif
 
 import CoreFoundation
@@ -40,6 +44,9 @@ open class Host: NSObject {
     }
     
     static internal func currentHostName() -> String {
+#if CAN_IMPORT_MINGWCRT
+        return "unknown"
+#else
         let hname = UnsafeMutablePointer<Int8>.allocate(capacity: Int(NI_MAXHOST))
         defer {
             hname.deinitialize()
@@ -50,6 +57,7 @@ open class Host: NSObject {
             return "localhost"
         }
         return String(cString: hname)
+#endif
     }
     
     open class func current() -> Host {
@@ -69,7 +77,7 @@ open class Host: NSObject {
     }
     
     internal func _resolveCurrent() {
-#if os(Android)
+#if os(Android) || CAN_IMPORT_MINGWCRT
         return
 #else
         var ifaddr: UnsafeMutablePointer<ifaddrs>? = nil
@@ -100,7 +108,7 @@ open class Host: NSObject {
     }
     
     internal func _resolve() {
-#if os(Android)
+#if os(Android) || CAN_IMPORT_MINGWCRT
         return
 #else
         if _resolved {
@@ -119,7 +127,7 @@ open class Host: NSObject {
             }
             var hints = addrinfo()
             hints.ai_family = PF_UNSPEC
-#if os(OSX) || os(iOS) || os(Android)
+#if os(OSX) || os(iOS) || os(Android) || os(Cygwin)
             hints.ai_socktype = SOCK_STREAM
 #else
             hints.ai_socktype = Int32(SOCK_STREAM.rawValue)

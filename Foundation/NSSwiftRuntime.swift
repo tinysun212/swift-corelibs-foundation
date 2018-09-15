@@ -14,13 +14,17 @@ import CoreFoundation
 // This mimics the behavior of the swift sdk overlay on Darwin
 #if os(OSX) || os(iOS)
 @_exported import Darwin
-#elseif os(Linux) || os(Android) || CYGWIN
+#elseif os(Linux) || os(Android)
 @_exported import Glibc
+#elseif os(Cygwin)
+@_exported import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+@_exported import MinGWCrt
 #endif
 
 @_exported import Dispatch
 
-#if os(Android) // shim required for bzero
+#if os(Android) || CAN_IMPORT_MINGWCRT // shim required for bzero
 @_transparent func bzero(_ ptr: UnsafeMutableRawPointer, _ size: size_t) {
     memset(ptr, 0, size)
 }
@@ -125,7 +129,11 @@ internal func _CFSwiftCopyWithZone(_ cf: CFTypeRef, _ zone: CFTypeRef?) -> Unman
 
 
 internal func _CFSwiftGetHash(_ cf: AnyObject) -> CFHashCode {
+#if CAN_IMPORT_MINGWCRT && arch(x86_64)
+    return CFHashCode(bitPattern: Int64((cf as! NSObject).hash))
+#else
     return CFHashCode(bitPattern: (cf as! NSObject).hash)
+#endif
 }
 
 

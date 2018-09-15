@@ -12,8 +12,12 @@ import CoreFoundation
 
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
 import Glibc
+#elseif os(Cygwin)
+import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+import MinGWCrt
 #endif
 
 #if os(OSX) || os(iOS)
@@ -21,11 +25,21 @@ internal let kCFURLPOSIXPathStyle = CFURLPathStyle.cfurlposixPathStyle
 internal let kCFURLWindowsPathStyle = CFURLPathStyle.cfurlWindowsPathStyle
 #endif
 
+#if os(Windows)
+internal let FilesystemPathDelimiter:Character = "\\"
+#else
+internal let FilesystemPathDelimiter:Character = "/"
+#endif
+
 private func _standardizedPath(_ path: String) -> String {
     if !path.absolutePath {
         return path._nsObject.standardizingPath
     }
+#if os(Windows)
+    return _pathAsWindowsPathStyle(path)
+#else
     return path
+#endif
 }
 
 internal func _pathComponents(_ path: String?) -> [String]? {
@@ -40,30 +54,92 @@ internal func _pathComponents(_ path: String?) -> [String]? {
         let characterView = p
         var curPos = characterView.startIndex
         let endPos = characterView.endIndex
+#if os(Windows)
+            // Check if path is UNC path
+            var tmpPos = curPos
+            while tmpPos < endPos && (characterView[tmpPos] == "/" || characterView[tmpPos] == "\\") {
+                tmpPos = characterView.index(after: tmpPos)
+            }
+
+            if tmpPos != curPos && tmpPos < endPos {
+                tmpPos = characterView.index(after: tmpPos)
+
+                if characterView[tmpPos] == "/" || characterView[tmpPos] == "\\" {
+                    result.append("\\\\")
+                    curPos = tmpPos
+                }
+            }
+#else
         if characterView[curPos] == "/" {
             result.append("/")
         }
+#endif
 
         while curPos < endPos {
+#if os(Windows)
+            while curPos < endPos && (characterView[curPos] == "/" || characterView[curPos] == "\\") {
+                curPos = characterView.index(after: curPos)
+            }
+#else
             while curPos < endPos && characterView[curPos] == "/" {
                 curPos = characterView.index(after: curPos)
             }
+#endif
             if curPos == endPos {
                 break
             }
             var curEnd = curPos
+#if os(Windows)
+            while curEnd < endPos && (characterView[curEnd] != "/" && characterView[curEnd] != "\\") {
+                curEnd = characterView.index(after: curEnd)
+            }
+#else
             while curEnd < endPos && characterView[curEnd] != "/" {
                 curEnd = characterView.index(after: curEnd)
             }
+#endif
             result.append(String(characterView[curPos ..< curEnd]))
             curPos = curEnd
         }
     }
+#if os(Windows)
+        if p.length > 1 && (p.hasSuffix("/") || p.hasSuffix("\\")) {
+            result.append("\\")
+        }
+#else
     if p.length > 1 && p.hasSuffix("/") {
         result.append("/")
     }
+#endif
     return result
 }
+
+#if os(Windows)
+internal func _pathAsWindowsPathStyle(_ path: String) -> String {
+    var components = _pathComponents(path)!
+
+    guard !components.isEmpty else {
+        return path
+    }
+
+    let lastComponent = components.removeLast()
+
+    var result = components.removeFirst()
+
+    for component in components {
+        result = result._stringByAppendingPathComponent(component)
+    }
+
+    if lastComponent == "/" || lastComponent == "\\" {
+        result.append("\\")
+
+    } else {
+        result = result._stringByAppendingPathComponent(lastComponent)
+    }
+
+    return result
+}
+#endif
 
 public struct URLResourceKey : RawRepresentable, Equatable, Hashable {
     public private(set) var rawValue: String
@@ -299,10 +375,17 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
         
         let thePath = _standardizedPath(path)
         if thePath.length > 0 {
-            
+#if os(Windows)
+            _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLWindowsPathStyle, isDir, baseURL?._cfObject)
+#else
             _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLPOSIXPathStyle, isDir, baseURL?._cfObject)
+#endif
         } else if let baseURL = baseURL {
+#if os(Windows)
+            _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, baseURL.path._cfObject, kCFURLWindowsPathStyle, baseURL.hasDirectoryPath, nil)
+#else
             _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, baseURL.path._cfObject, kCFURLPOSIXPathStyle, baseURL.hasDirectoryPath, nil)
+#endif
         }
     }
     
@@ -311,14 +394,18 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
         let thePath = _standardizedPath(path)
         
         var isDir: ObjCBool = false
-        if thePath.hasSuffix("/") {
+        if thePath.hasSuffix(String(FilesystemPathDelimiter)) {
             isDir = true
         } else {
             let absolutePath: String
             if let absPath = baseURL?.appendingPathComponent(path).path {
                 absolutePath = absPath
             } else {
+#if os(Windows)
+                absolutePath = path.hasPrefix("~") ? NSString(string: path).expandingTildeInPath : path._stringByFixingSlashes(compress: false, stripTrailing: true)
+#else
                 absolutePath = path
+#endif
             }
             
             let _ = FileManager.default.fileExists(atPath: absolutePath, isDirectory: &isDir)
@@ -337,19 +424,33 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
         if !pathString.isAbsolutePath {
             thePath = pathString.standardizingPath
         } else {
+#if os(Windows)
+            thePath = _pathAsWindowsPathStyle(path)
+#else
             thePath = path
+#endif
         }
 
         var isDir: ObjCBool = false
-        if thePath.hasSuffix("/") {
+        if thePath.hasSuffix(String(FilesystemPathDelimiter)) {
             isDir = true
         } else {
+#if os(Windows)
+            if !FileManager.default.fileExists(atPath: path.hasPrefix("~") ? pathString.expandingTildeInPath : path._stringByFixingSlashes(compress: false, stripTrailing: true), isDirectory: &isDir) {
+                isDir = false
+            }
+#else
             if !FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
                 isDir = false
             }
+#endif
         }
         super.init()
+#if os(Windows)
+        _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLWindowsPathStyle, isDir, nil)
+#else
         _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLPOSIXPathStyle, isDir.boolValue, nil)
+#endif
     }
     
     public convenience init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory isDir: Bool, relativeTo baseURL: URL?) {
@@ -495,7 +596,7 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
     
     open var password: String? {
         let absoluteURL = CFURLCopyAbsoluteURL(_cfObject)
-#if os(Linux) || os(Android) || CYGWIN
+#if os(Linux) || os(Android) || os(Cygwin) || CAN_IMPORT_MINGWCRT
         let passwordRange = CFURLGetByteRangeForComponent(absoluteURL, kCFURLComponentPassword, nil)
 #else
         let passwordRange = CFURLGetByteRangeForComponent(absoluteURL, .password, nil)
@@ -519,7 +620,11 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
     
     open var path: String? {
         let absURL = CFURLCopyAbsoluteURL(_cfObject)
+#if os(Windows)
+        return CFURLCopyFileSystemPath(absURL, kCFURLWindowsPathStyle)?._swiftObject
+#else
         return CFURLCopyFileSystemPath(absURL, kCFURLPOSIXPathStyle)?._swiftObject
+#endif
     }
     
     open var fragment: String? {
@@ -536,7 +641,11 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
     
     // The same as path if baseURL is nil
     open var relativePath: String? {
+#if os(Windows)
+        return CFURLCopyFileSystemPath(_cfObject, kCFURLWindowsPathStyle)?._swiftObject
+#else
         return CFURLCopyFileSystemPath(_cfObject, kCFURLPOSIXPathStyle)?._swiftObject
+#endif
     }
     
     /* Determines if a given URL string's path represents a directory (i.e. the path component in the URL string ends with a '/' character). This does not check the resource the URL refers to.
@@ -558,8 +667,11 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
     
     // Memory leak. See https://github.com/apple/swift-corelibs-foundation/blob/master/Docs/Issues.md
     open var fileSystemRepresentation: UnsafePointer<Int8> {
-        
+#if CAN_IMPORT_MINGWCRT        
+        let bufSize = Int(_MAX_PATH + 1)
+#else
         let bufSize = Int(PATH_MAX + 1)
+#endif
         
         let _fsrBuffer = UnsafeMutablePointer<Int8>.allocate(capacity: bufSize)
         for i in 0..<bufSize {
@@ -701,11 +813,19 @@ extension NSURL {
     */
     open class func fileURL(withPathComponents components: [String]) -> URL? {
         let path = NSString.pathWithComponents(components)
+#if os(Windows)
+        if components.last == "/" || components.last == "\\" {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        } else {
+            return URL(fileURLWithPath: path)
+        }
+#else
         if components.last == "/" {
             return URL(fileURLWithPath: path, isDirectory: true)
         } else {
             return URL(fileURLWithPath: path)
         }
+#endif
     }
     
     internal func _pathByFixingSlashes(compress : Bool = true, stripTrailing: Bool = true) -> String? {
@@ -713,9 +833,15 @@ extension NSURL {
             return nil
         }
 
+#if os(Windows)
+        if p.count == 2 && p.hasSuffix(":") {
+            return p
+        }
+#else
         if p == "/" {
             return p
         }
+#endif
 
         var result = p
         if compress {
@@ -725,13 +851,13 @@ extension NSURL {
                 var curPos = startPos
 
                 while curPos < endPos {
-                    if characterView[curPos] == "/" {
+                    if characterView[curPos] == FilesystemPathDelimiter {
                         var afterLastSlashPos = curPos
-                        while afterLastSlashPos < endPos && characterView[afterLastSlashPos] == "/" {
+                        while afterLastSlashPos < endPos && characterView[afterLastSlashPos] == FilesystemPathDelimiter {
                             afterLastSlashPos = characterView.index(after: afterLastSlashPos)
                         }
                         if afterLastSlashPos != characterView.index(after: curPos) {
-                            characterView.replaceSubrange(curPos ..< afterLastSlashPos, with: ["/"])
+                            characterView.replaceSubrange(curPos ..< afterLastSlashPos, with: [FilesystemPathDelimiter])
                             endPos = characterView.endIndex
                         }
                         curPos = afterLastSlashPos
@@ -741,7 +867,7 @@ extension NSURL {
                 }
             }
         }
-        if stripTrailing && result.hasSuffix("/") {
+        if stripTrailing && result.hasSuffix(String(FilesystemPathDelimiter)) {
             result.remove(at: result.index(before: result.endIndex))
         }
         return result
@@ -779,7 +905,12 @@ extension NSURL {
     
     open func appendingPathComponent(_ pathComponent: String) -> URL? {
         var result : URL? = appendingPathComponent(pathComponent, isDirectory: false)
-        if !pathComponent.hasSuffix("/") && isFileURL {
+#if os(Windows)
+        let hasPathDelimiterSuffix = (pathComponent.hasSuffix("/") || pathComponent.hasSuffix("\\"))
+#else
+        let hasPathDelimiterSuffix = pathComponent.hasSuffix("/")
+#endif
+        if !hasPathDelimiterSuffix && isFileURL {
             if let urlWithoutDirectory = result {
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: urlWithoutDirectory.path, isDirectory: &isDir) && isDir.boolValue {
@@ -829,7 +960,7 @@ extension NSURL {
         }
 
         let absolutePath: String
-        if selfPath.hasPrefix("/") {
+        if selfPath.hasPrefix(String(FilesystemPathDelimiter)) {
             absolutePath = selfPath
         } else {
             let workingDir = FileManager.default.currentDirectoryPath
@@ -864,29 +995,37 @@ extension NSURL {
         var isExistingDirectory: ObjCBool = false
         let _ = FileManager.default.fileExists(atPath: resolvedPath, isDirectory: &isExistingDirectory)
 
+#if !os(Windows)
         if excludeSystemDirs {
             resolvedPath = resolvedPath._tryToRemovePathPrefix("/private") ?? resolvedPath
         }
-
-        if isExistingDirectory.boolValue && !resolvedPath.hasSuffix("/") {
-            resolvedPath += "/"
+#endif        
+        if isExistingDirectory.boolValue && !resolvedPath.hasSuffix(String(FilesystemPathDelimiter)) {
+            resolvedPath += String(FilesystemPathDelimiter)
         }
-        
         return URL(fileURLWithPath: resolvedPath)
     }
 
     fileprivate func _pathByRemovingDots(_ comps: [String]) -> String {
         var components = comps
-        
+#if os(Windows)
+        if (components.last == "/" || components.last == "\\") {
+            components.removeLast()
+        }
+#else        
         if(components.last == "/") {
             components.removeLast()
         }
-
+#endif
         guard !components.isEmpty else {
             return self.path!
         }
-
+#if os(Windows)
+        let firstComponent = components.first
+        let isAbsolutePath = firstComponent! == "\\\\" || firstComponent!.hasSuffix(":\\") || firstComponent!.hasSuffix(":/") || firstComponent!.hasSuffix(":")
+#else
         let isAbsolutePath = components.first == "/"
+#endif
         var result : String = components.removeFirst()
 
         for component in components {
@@ -900,8 +1039,8 @@ extension NSURL {
             }
         }
 
-        if(self.path!.hasSuffix("/")) {
-            result += "/"
+        if(self.path!.hasSuffix(String(FilesystemPathDelimiter))) {
+            result += String(FilesystemPathDelimiter)
         }
 
         return result

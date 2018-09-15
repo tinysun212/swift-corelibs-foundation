@@ -1023,7 +1023,7 @@ CF_PRIVATE void _CFIterateDirectory(CFStringRef directoryPath, Boolean appendSla
     if (!CFStringGetFileSystemRepresentation(directoryPath, directoryPathBuf, CFMaxPathSize)) return;
     
 #if DEPLOYMENT_TARGET_WINDOWS
-#error this path does not support calculateFullResultPath but it must do so someday
+//#error this path does not support calculateFullResultPath but it must do so someday
     CFIndex cpathLen = strlen(directoryPathBuf);
     // Make sure there is room for the additional space we need in the win32 api
     if (cpathLen + 2 < CFMaxPathSize) {
@@ -1059,7 +1059,8 @@ CF_PRIVATE void _CFIterateDirectory(CFStringRef directoryPath, Boolean appendSla
                 }
                 
                 Boolean isDirectory = file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
-                Boolean result = fileHandler(fileName, isDirectory ? DT_DIR : DT_REG);
+                CFStringRef fileNameWithPrefix = CFRetain(fileName);
+                Boolean result = fileHandler(fileName, fileNameWithPrefix, isDirectory ? DT_DIR : DT_REG);
                 CFRelease(fileName);
                 if (!result) break;
             } while (FindNextFileW(handle, &file));

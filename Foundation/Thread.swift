@@ -10,8 +10,12 @@
 
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
 import Glibc
+#elseif os(Cygwin)
+import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+import MinGWCrt
 #endif
 import CoreFoundation
 
@@ -101,14 +105,22 @@ open class Thread : NSObject {
         var ti = end_at - start_at
         let end_ut = start_ut + ti
         while (0.0 < ti) {
+#if CAN_IMPORT_MINGWCRT
+            var __ts__ = timespec(tv_sec: Int64.max, tv_nsec: 0)
+#else
             var __ts__ = timespec(tv_sec: Int.max, tv_nsec: 0)
+#endif
             if ti < Double(Int.max) {
                 var integ = 0.0
                 let frac: Double = withUnsafeMutablePointer(to: &integ) { integp in
                     return modf(ti, integp)
                 }
+#if CAN_IMPORT_MINGWCRT
+                __ts__.tv_sec = Int64(integ)
+#else
                 __ts__.tv_sec = Int(integ)
-                __ts__.tv_nsec = Int(frac * 1000000000.0)
+#endif
+                __ts__.tv_nsec = CLong(frac * 1000000000.0)
             }
             let _ = withUnsafePointer(to: &__ts__) { ts in
                 nanosleep(ts, nil)
@@ -122,14 +134,22 @@ open class Thread : NSObject {
         let start_ut = CFGetSystemUptime()
         let end_ut = start_ut + ti
         while 0.0 < ti {
+#if CAN_IMPORT_MINGWCRT
+            var __ts__ = timespec(tv_sec: Int64.max, tv_nsec: 0)
+#else
             var __ts__ = timespec(tv_sec: Int.max, tv_nsec: 0)
+#endif
             if ti < Double(Int.max) {
                 var integ = 0.0
                 let frac: Double = withUnsafeMutablePointer(to: &integ) { integp in
                     return modf(ti, integp)
                 }
+#if CAN_IMPORT_MINGWCRT
+                __ts__.tv_sec = Int64(integ)
+#else
                 __ts__.tv_sec = Int(integ)
-                __ts__.tv_nsec = Int(frac * 1000000000.0)
+#endif
+                __ts__.tv_nsec = CLong(frac * 1000000000.0)
             }
             let _ = withUnsafePointer(to: &__ts__) { ts in
                 nanosleep(ts, nil)
@@ -146,7 +166,7 @@ open class Thread : NSObject {
     internal var _main: () -> Void = {}
     private var _thread: pthread_t? = nil
 
-#if CYGWIN
+#if os(Cygwin)
     internal var _attr : pthread_attr_t? = nil
 #else
     internal var _attr = pthread_attr_t()
@@ -181,7 +201,7 @@ open class Thread : NSObject {
             _status = .finished
             return
         }
-#if CYGWIN
+#if os(Cygwin)
         if let attr = self._attr {
             _thread = self.withRetainedReference {
               return _CFThreadCreate(attr, NSThreadStart, $0)

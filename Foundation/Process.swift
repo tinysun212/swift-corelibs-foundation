@@ -12,8 +12,12 @@ import CoreFoundation
 
 #if os(OSX) || os(iOS)
     import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
     import Glibc
+#elseif os(Cygwin)
+    import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+    import MinGWCrt
 #endif
 
 extension Process {
@@ -200,6 +204,8 @@ open class Process: NSObject {
     
     // actions
     open func launch() {
+#if CAN_IMPORT_MINGWCRT
+#else
         
         self.processLaunchedCondition.lock()
     
@@ -257,7 +263,7 @@ open class Process: NSObject {
         }
 
         var taskSocketPair : [Int32] = [0, 0]
-#if os(OSX) || os(iOS)
+#if os(OSX) || os(iOS) || os(Cygwin)
         socketpair(AF_UNIX, SOCK_STREAM, 0, &taskSocketPair)
 #else
         socketpair(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0, &taskSocketPair)
@@ -281,7 +287,7 @@ open class Process: NSObject {
             process.processLaunchedCondition.unlock()
             
             var exitCode : Int32 = 0
-#if CYGWIN
+#if os(Cygwin)
             let exitCodePtrWrapper = withUnsafeMutablePointer(to: &exitCode) {
                 exitCodePtr in
                 __wait_status_ptr_t(__int_ptr: exitCodePtr)
@@ -290,7 +296,7 @@ open class Process: NSObject {
             var waitResult : Int32 = 0
             
             repeat {
-#if CYGWIN
+#if os(Cygwin)
                 waitResult = waitpid( process.processIdentifier, exitCodePtrWrapper, 0)
 #else
                 waitResult = waitpid( process.processIdentifier, &exitCode, 0)
@@ -336,7 +342,7 @@ open class Process: NSObject {
         CFRunLoopAddSource(managerThreadRunLoop?._cfRunLoop, source, kCFRunLoopDefaultMode)
 
         // file_actions
-        #if os(OSX) || os(iOS) || CYGWIN
+        #if os(OSX) || os(iOS) || os(Cygwin)
             var fileActions: posix_spawn_file_actions_t? = nil
         #else
             var fileActions: posix_spawn_file_actions_t = posix_spawn_file_actions_t()
@@ -458,6 +464,7 @@ open class Process: NSObject {
         
         self.processLaunchedCondition.unlock()
         self.processLaunchedCondition.broadcast()
+#endif
     }
     
     open func interrupt() { NSUnimplemented() } // Not always possible. Sends SIGINT.

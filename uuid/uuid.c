@@ -54,7 +54,7 @@ static inline void nanotime(struct timespec *tv) {
     tv->tv_nsec = now - (tv->tv_sec * 1000000000);
 }
 
-#elif TARGET_OS_LINUX
+#elif TARGET_OS_LINUX || TARGET_OS_WINDOWS
 #include <time.h>
 
 static inline void nanotime(struct timespec *tv) {
@@ -63,7 +63,7 @@ static inline void nanotime(struct timespec *tv) {
 
 #endif
 
-static inline void read_random(void *buffer, u_int numBytes) {
+static inline void read_random(void *buffer, unsigned int numBytes) {
     int fd = open("/dev/urandom", O_RDONLY);
     read(fd, buffer, numBytes);
     close(fd);

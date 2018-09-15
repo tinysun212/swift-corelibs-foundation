@@ -9,7 +9,7 @@
 
 
 import CoreFoundation
-import Dispatch
+//import Dispatch
 
 open class NSDictionary : NSObject, NSCopying, NSMutableCopying, NSSecureCoding, NSCoding {
     private let _cfinfo = _CFInfo(typeID: CFDictionaryGetTypeID())
@@ -502,7 +502,11 @@ open class NSDictionary : NSObject, NSCopying, NSMutableCopying, NSSecureCoding,
         }
         
         if opts.contains(.concurrent) {
+#if CAN_IMPORT_MINGWCRT || os(Cygwin)
+            NSUnimplemented()
+#else
             DispatchQueue.concurrentPerform(iterations: count, execute: iteration)
+#endif
         } else {
             for idx in 0..<count {
                 iteration(idx)

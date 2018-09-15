@@ -13,6 +13,7 @@
 
 #if !defined(CF_EXCLUDE_CSTD_HEADERS)
 
+#include <assert.h>
 #include <sys/types.h>
 #include <stdarg.h>
 #include <assert.h>

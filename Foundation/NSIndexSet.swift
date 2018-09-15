@@ -7,7 +7,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 
-import Dispatch
+//import Dispatch
 
 /* Class for managing set of indexes. The set of valid indexes are 0 .. NSNotFound - 1; trying to use indexes outside this range is an error.  NSIndexSet uses NSNotFound as a return value in cases where the queried index doesn't exist in the set; for instance, when you ask firstIndex and there are no indexes; or when you ask for indexGreaterThanIndex: on the last index, and so on.
 
@@ -434,7 +434,11 @@ open class NSIndexSet : NSObject, NSCopying, NSMutableCopying, NSSecureCoding {
         }
         
         if opts.contains(.concurrent) {
+#if CAN_IMPORT_MINGWCRT || os(Cygwin)
+            NSUnimplemented()
+#else
             DispatchQueue.concurrentPerform(iterations: Int(rangeSequence.count), execute: iteration)
+#endif
         } else {
             for idx in 0..<Int(rangeSequence.count) {
                 iteration(idx)

@@ -569,7 +569,7 @@ CF_EXPORT CFMessagePortRef _CFMessagePortCreateLocalEx(CFAllocatorRef allocator,
 
 #if TARGET_OS_MAC || TARGET_OS_EMBEDDED || TARGET_OS_IPHONE
 #include <pthread.h>
-#elif !TARGET_OS_LINUX
+#elif !TARGET_OS_LINUX && !TARGET_OS_WINDOWS
 // Avoid including the pthread header
 #ifndef HAVE_STRUCT_TIMESPEC
 #define HAVE_STRUCT_TIMESPEC 1
@@ -635,6 +635,8 @@ typedef void (*CFWindowsMessageQueueHandler)(void);
 // Run Loop parameter must be the current thread's run loop for the next two functions; you cannot use another thread's run loop
 CF_EXPORT CFWindowsMessageQueueHandler _CFRunLoopGetWindowsMessageQueueHandler(CFRunLoopRef rl, CFStringRef modeName);
 CF_EXPORT void _CFRunLoopSetWindowsMessageQueueHandler(CFRunLoopRef rl, CFStringRef modeName, CFWindowsMessageQueueHandler func);
+
+void timeradd(struct timeval *a, struct timeval *b, struct timeval *res);
 
 #endif
 

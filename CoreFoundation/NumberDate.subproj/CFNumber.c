@@ -1097,6 +1097,23 @@ void _CFNumberInitUInt32(CFNumberRef result, uint32_t value) {
     _CFNumberInit(result, kCFNumberIntType, &value);
 }
 
+#if __LLP64__
+void _CFNumberInitInt(CFNumberRef result, long long value) {
+    _CFNumberInit(result, kCFNumberLongLongType, &value);
+}
+
+void _CFNumberInitUInt(CFNumberRef result, unsigned long long value) {
+    _CFNumberInit(result, kCFNumberLongLongType, &value);
+}
+
+void _CFNumberInitInt64(CFNumberRef result, long long value) {
+    _CFNumberInit(result, kCFNumberLongLongType, &value);
+}
+
+void _CFNumberInitUInt64(CFNumberRef result, unsigned long long value) {
+    _CFNumberInit(result, kCFNumberLongLongType, &value);
+}
+#else
 void _CFNumberInitInt(CFNumberRef result, long value) {
     _CFNumberInit(result, kCFNumberLongType, &value);
 }
@@ -1120,6 +1137,7 @@ void _CFNumberInitFloat(CFNumberRef result, float value) {
 void _CFNumberInitDouble(CFNumberRef result, double value) {
     _CFNumberInit(result, kCFNumberDoubleType, &value);
 }
+#endif
 
 static CFNumberRef _CFNumberCreate(CFAllocatorRef allocator, CFNumberType type, const void *valuePtr) {
     __CFAssertIsValidNumberType(type);

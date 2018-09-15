@@ -25,7 +25,9 @@
 #include <CoreFoundation/CFLogUtilities.h>
 #include <CoreFoundation/CFURLSessionInterface.h>
 #include <CoreFoundation/ForFoundationOnly.h>
+#if __has_include(<fts.h>)
 #include <fts.h>
+#endif
 #include <pthread.h>
 
 #if __has_include(<execinfo.h>)
@@ -382,7 +384,7 @@ static inline _Bool _resizeConditionalAllocationBuffer(_ConditionalAllocationBuf
     return true;
 }
 
-static inline _Bool _withStackOrHeapBuffer(size_t amount, void (__attribute__((noescape)) ^ _Nonnull applier)(_ConditionalAllocationBuffer *_Nonnull)) {
+static inline _Bool _withStackOrHeapBuffer(size_t amount, void (CF_NOESCAPE ^ _Nonnull applier)(_ConditionalAllocationBuffer *_Nonnull)) {
     _ConditionalAllocationBuffer buffer;
 #if TARGET_OS_MAC
     buffer.capacity = malloc_good_size(amount);

@@ -1368,3 +1368,11 @@ extension POSIXError {
     /// Interface output queue is full.
     public static var EQFULL: POSIXError.Code { return .EQFULL }
 }
+
+#if CAN_IMPORT_MINGWCRT && arch(x86_64)
+extension Int {
+    init(bitPattern obj: UInt64) {
+        self.init(Int64(bitPattern: obj))
+    }
+}
+#endif

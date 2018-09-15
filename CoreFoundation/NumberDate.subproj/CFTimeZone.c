@@ -55,6 +55,43 @@ struct tzhead {
     char	tzh_typecnt[4];		/* coded number of local time types */
     char	tzh_charcnt[4];		/* coded number of abbr. chars */
 };
+#elif DEPLOYMENT_TARGET_WINDOWS
+#include <tchar.h>
+#define TZZONEINFO "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"
+#define _USE_ZONEINFO_RESOURCE 1
+#endif
+
+#if _USE_ZONEINFO_RESOURCE
+struct ZoneInfoListStruct {
+  const char *zoneId;
+  const char *data;
+  int length;
+};
+
+#include "CFZoneInfo.inc"
+
+Boolean _CFGetZoneInfoFromResource(CFStringRef tz_name, void **bytes,
+                                 CFIndex *length) {
+    
+  char name[64];
+  Boolean success;
+  success = CFStringGetCString(tz_name, name, sizeof(name),
+                               kCFStringEncodingMacRoman);
+  if (!success)
+    return false;
+
+  const int zoneInfoArraySize = 
+    sizeof(zoneInfoList) / sizeof(struct ZoneInfoListStruct);
+
+  for (int i = 0; i < zoneInfoArraySize; i++) {
+    if (strcmp(zoneInfoList[i].zoneId, name) == 0) {
+      *bytes = (void *)zoneInfoList[i].data;
+      *length = zoneInfoList[i].length;
+      return true;
+    }
+  }
+  return false;
+}
 #endif
 
 #include <time.h>
@@ -104,7 +141,7 @@ CF_INLINE void __CFTimeZoneUnlockCompatibilityMapping(void) {
     __CFUnlock(&__CFTimeZoneCompatibilityMappingLock);
 }
 
-#if DEPLOYMENT_TARGET_WINDOWS
+#if 0 
 /* This function should be used for WIN32 instead of
  * __CFCopyRecursiveDirectoryList function.
  * It takes TimeZone names from the registry
@@ -140,7 +177,37 @@ static CFMutableArrayRef __CFCopyWindowsTimeZoneList() {
     RegCloseKey(hkResult);
     return result;
 }
-#elif DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_WINDOWS || DEPLOYMENT_TARGET_LINUX || DEPLOYMENT_TARGET_FREEBSD
+#elif DEPLOYMENT_TARGET_WINDOWS
+static CFMutableArrayRef __CFCopyRecursiveDirectoryList() {
+    CFMutableArrayRef result = NULL;
+
+    UErrorCode status = U_ZERO_ERROR;
+    UEnumeration *time_zone_ids = ucal_openTimeZoneIDEnumeration(UCAL_ZONE_TYPE_CANONICAL_LOCATION, NULL, NULL, &status);
+    if (status != U_ZERO_ERROR)
+        return NULL;
+    
+    result = CFArrayCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeArrayCallBacks);
+
+    int len = 0;
+    status = U_ZERO_ERROR;
+    const char *zoneId = uenum_next(time_zone_ids, &len, &status);
+
+    while (zoneId != NULL && status == U_ZERO_ERROR) {
+        CFStringRef string = CFStringCreateWithBytes(kCFAllocatorSystemDefault, (const unsigned char *)zoneId, len, CFStringGetSystemEncoding(), false);
+        CFArrayAppendValue(result, string);
+        CFRelease(string);
+        zoneId = uenum_next(time_zone_ids, &len, &status);
+    }
+
+    uenum_close(time_zone_ids);
+    if (status != U_ZERO_ERROR) {
+        CFRelease(result);
+        return NULL;
+    }
+
+    return result;
+}
+#elif DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_LINUX || DEPLOYMENT_TARGET_FREEBSD
 static CFMutableArrayRef __CFCopyRecursiveDirectoryList() {
     CFMutableArrayRef result = CFArrayCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeArrayCallBacks);
     if (!__tzDir) __InitTZStrings();
@@ -295,7 +362,12 @@ static Boolean __CFParseTimeZoneData(CFAllocatorRef allocator, CFDataRef data, C
 
     p = CFDataGetBytePtr(data);
     len = CFDataGetLength(data);
-    if (len < (int32_t)sizeof(struct tzhead)) {
+#if DEPLOYMENT_TARGET_WINDOWS
+    int32_t tzhead_len = 0;
+#else
+    int32_t tzhead_len = (int32_t)sizeof(struct tzhead);
+#endif 
+    if (len < tzhead_len) {
 	return false;
     }
     
@@ -316,7 +388,7 @@ static Boolean __CFParseTimeZoneData(CFAllocatorRef allocator, CFDataRef data, C
 	// security reasons and to reject potentially corrupt files
 	return false;
     }
-    if (len - (int32_t)sizeof(struct tzhead) < (4 + 1) * timecnt + (4 + 1 + 1) * typecnt + charcnt) {
+    if (len - tzhead_len < (4 + 1) * timecnt + (4 + 1 + 1) * typecnt + charcnt) {
 	return false;
     }
     timep = p;
@@ -747,7 +819,7 @@ static CFTimeZoneRef __CFTimeZoneCreateSystem(void) {
     
     CFStringRef name = NULL;
     
-#if DEPLOYMENT_TARGET_WINDOWS
+#if 0
     TIME_ZONE_INFORMATION tzi = { 0 };
     DWORD rval = GetTimeZoneInformation(&tzi);
     if (rval != TIME_ZONE_ID_INVALID) {
@@ -765,6 +837,16 @@ static CFTimeZoneRef __CFTimeZoneCreateSystem(void) {
     } else {
         CFLog(kCFLogLevelError, CFSTR("Couldn't get time zone information error %d"), GetLastError());
     }
+#elif DEPLOYMENT_TARGET_WINDOWS
+    // The Win32 API GetTimeZoneInformation() returns the time zone name in the locale unicode string.
+    // Some localization of the Windows have the time zone names of non-Engliash characters.
+    // In that case, the name cann't be used as a key of the dictionary of the CFTimeZoneCopyWinToOlsonDictionary().
+    // Instead, let the ICU library do this with its own database.
+    UChar default_tz[64];
+    UErrorCode status = U_ZERO_ERROR;
+    int len = ucal_getDefaultTimeZone(default_tz, 64, &status);
+
+    name = CFStringCreateWithBytes(kCFAllocatorSystemDefault, (UInt8 *)default_tz, len*sizeof(UChar), kCFStringEncodingUTF16LE, false);
 #else
     const char *tzenv;
     int ret;
@@ -960,6 +1042,7 @@ static const char *__CFTimeZoneAbbreviationDefaults =
 "    <key>PHT</key>  <string>Asia/Manila</string>"
 "    <key>PKT</key>  <string>Asia/Karachi</string>"
 "    <key>PST</key>  <string>America/Los_Angeles</string>"
+"    <key>ROK</key>  <string>Asia/Seoul</string>"
 "    <key>SGT</key>  <string>Asia/Singapore</string>"
 "    <key>UTC</key>  <string>UTC</string>"
 "    <key>WAT</key>  <string>Africa/Lagos</string>"
@@ -1185,6 +1268,11 @@ Boolean _CFTimeZoneInit(CFTimeZoneRef timeZone, CFStringRef name, CFDataRef data
                 CFDictionaryRef abbrevs = CFTimeZoneCopyAbbreviationDictionary();
                 tzName = CFDictionaryGetValue(abbrevs, name);
                 if (NULL != tzName) {
+#if _USE_ZONEINFO_RESOURCE
+                    if (_CFGetZoneInfoFromResource(tzName, &bytes, &length)) {
+                        data = CFDataCreateWithBytesNoCopy(kCFAllocatorSystemDefault, bytes, length, kCFAllocatorNull);
+                    }
+#else
                     tempURL = CFURLCreateCopyAppendingPathComponent(kCFAllocatorSystemDefault, baseURL, tzName, false);
                     if (NULL != tempURL) {
                         if (_CFReadBytesFromFile(kCFAllocatorSystemDefault, tempURL, &bytes, &length, 0, 0)) {
@@ -1192,6 +1280,7 @@ Boolean _CFTimeZoneInit(CFTimeZoneRef timeZone, CFStringRef name, CFDataRef data
                         }
                         CFRelease(tempURL);
                     }
+#endif
                 }
                 CFRelease(abbrevs);
             }
@@ -1216,6 +1305,11 @@ Boolean _CFTimeZoneInit(CFTimeZoneRef timeZone, CFStringRef name, CFDataRef data
             }
             if (NULL == data) {
                 tzName = name;
+#if _USE_ZONEINFO_RESOURCE
+                if (_CFGetZoneInfoFromResource(tzName, &bytes, &length)) {
+                    data = CFDataCreateWithBytesNoCopy(kCFAllocatorSystemDefault, bytes, length, kCFAllocatorNull);
+                }
+#else
                 tempURL = CFURLCreateCopyAppendingPathComponent(kCFAllocatorSystemDefault, baseURL, tzName, false);
                 if (NULL != tempURL) {
                     if (_CFReadBytesFromFile(kCFAllocatorSystemDefault, tempURL, &bytes, &length, 0, 0)) {
@@ -1223,6 +1317,7 @@ Boolean _CFTimeZoneInit(CFTimeZoneRef timeZone, CFStringRef name, CFDataRef data
                     }
                     CFRelease(tempURL);
                 }
+#endif
             }
             CFRelease(baseURL);
             if (NULL != data) {
@@ -1386,6 +1481,11 @@ CFTimeZoneRef CFTimeZoneCreateWithName(CFAllocatorRef allocator, CFStringRef nam
 	CFDictionaryRef abbrevs = CFTimeZoneCopyAbbreviationDictionary();
 	tzName = CFDictionaryGetValue(abbrevs, name);
 	if (NULL != tzName) {
+#if _USE_ZONEINFO_RESOURCE
+            if (_CFGetZoneInfoFromResource(tzName, &bytes, &length)) {
+                data = CFDataCreateWithBytesNoCopy(kCFAllocatorSystemDefault, bytes, length, kCFAllocatorNull);
+            }
+#else
 	    tempURL = CFURLCreateCopyAppendingPathComponent(kCFAllocatorSystemDefault, baseURL, tzName, false);
 	    if (NULL != tempURL) {
 		if (_CFReadBytesFromFile(kCFAllocatorSystemDefault, tempURL, &bytes, &length, 0, 0)) {
@@ -1393,6 +1493,7 @@ CFTimeZoneRef CFTimeZoneCreateWithName(CFAllocatorRef allocator, CFStringRef nam
 		}
 		CFRelease(tempURL);
 	    }
+#endif
 	}
 	CFRelease(abbrevs);
     }
@@ -1417,6 +1518,11 @@ CFTimeZoneRef CFTimeZoneCreateWithName(CFAllocatorRef allocator, CFStringRef nam
     }
     if (NULL == data) {
        tzName = name;
+#if _USE_ZONEINFO_RESOURCE
+       if (_CFGetZoneInfoFromResource(tzName, &bytes, &length)) {
+           data = CFDataCreateWithBytesNoCopy(kCFAllocatorSystemDefault, bytes, length, kCFAllocatorNull);
+       }
+#else
        tempURL = CFURLCreateCopyAppendingPathComponent(kCFAllocatorSystemDefault, baseURL, tzName, false);
        if (NULL != tempURL) {
            if (_CFReadBytesFromFile(kCFAllocatorSystemDefault, tempURL, &bytes, &length, 0, 0)) {
@@ -1424,6 +1530,7 @@ CFTimeZoneRef CFTimeZoneCreateWithName(CFAllocatorRef allocator, CFStringRef nam
            }
            CFRelease(tempURL);
        }
+#endif
     }
     CFRelease(baseURL);
     if (NULL != data) {

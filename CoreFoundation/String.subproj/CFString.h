@@ -160,14 +160,14 @@ struct __CFConstStr {
         uint64_t _cfinfoa;
     } _base;
     uint8_t *_ptr;
-#if defined(__LP64__) && defined(__BIG_ENDIAN__)
+#if (defined(__LP64__) || defined(__LLP64__)) && defined(__BIG_ENDIAN__)
     uint64_t _length;
 #else
     uint32_t _length;
 #endif
 };
 
-#if DEPLOYMENT_TARGET_LINUX
+#if DEPLOYMENT_TARGET_LINUX || DEPLOYMENT_TARGET_WINDOWS
 #define CONST_STRING_LITERAL_SECTION __attribute__((section(".cfstrlit.data")))
 #else
 #define CONST_STRING_LITERAL_SECTION
@@ -775,12 +775,23 @@ CF_EXPORT
 CFStringRef CFStringGetNameOfEncoding(CFStringEncoding encoding);
 
 /* ID mapping functions from/to Cocoa NSStringEncoding.  Returns kCFStringEncodingInvalidId if no mapping exists.
+ * Returns with Swift Int type
 */
+#if __LLP64__
+CF_EXPORT
+unsigned long long CFStringConvertEncodingToNSStringEncoding(CFStringEncoding encoding);
+#else
 CF_EXPORT
 unsigned long CFStringConvertEncodingToNSStringEncoding(CFStringEncoding encoding);
+#endif
 
+#if __LLP64__
+CF_EXPORT
+CFStringEncoding CFStringConvertNSStringEncodingToEncoding(unsigned long long encoding);
+#else
 CF_EXPORT
 CFStringEncoding CFStringConvertNSStringEncodingToEncoding(unsigned long encoding);
+#endif
 
 /* ID mapping functions from/to Microsoft Windows codepage (covers both OEM & ANSI).  Returns kCFStringEncodingInvalidId if no mapping exists.
 */

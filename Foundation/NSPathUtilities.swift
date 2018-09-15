@@ -11,8 +11,12 @@ import CoreFoundation
 
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
 import Glibc
+#elseif os(Cygwin)
+import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+import MinGWCrt
 #endif
 
 public func NSTemporaryDirectory() -> String {
@@ -22,7 +26,17 @@ public func NSTemporaryDirectory() -> String {
     if r != 0 && r < buf.count {
         return String(cString: buf, encoding: .utf8)!
     }
-    #endif
+    #elseif os(Windows)
+    if let tmpdir = ProcessInfo.processInfo.environment["TMP"] {
+        if !tmpdir.hasSuffix("\\") {
+            return tmpdir + "\\"
+        } else {
+            return tmpdir
+        }
+    }
+
+    return "C:\\Temp"
+    #else
     if let tmpdir = ProcessInfo.processInfo.environment["TMPDIR"] {
         if !tmpdir.hasSuffix("/") {
             return tmpdir + "/"
@@ -31,12 +45,17 @@ public func NSTemporaryDirectory() -> String {
         }
     }
     return "/tmp/"
+    #endif
 }
 
 internal extension String {
     
     internal var _startOfLastPathComponent : String.Index {
+#if os(Windows)
+        precondition((!hasSuffix("/") && !hasSuffix("\\")) && length > 1)
+#else
         precondition(!hasSuffix("/") && length > 1)
+#endif
         
         let startPos = startIndex
         var curPos = endIndex
@@ -54,7 +73,11 @@ internal extension String {
     }
 
     internal var _startOfPathExtension : String.Index? {
+#if os(Windows)
+        precondition(!hasSuffix("/") && !hasSuffix("\\"))
+#else
         precondition(!hasSuffix("/"))
+#endif
 
         var currentPosition = endIndex
         let startOfLastPathComponent = _startOfLastPathComponent
@@ -63,7 +86,12 @@ internal extension String {
         while currentPosition > startOfLastPathComponent {
             let previousPosition = index(before: currentPosition)
             let character = self[previousPosition]
-            if character == "/" {
+#if os(Windows)
+            let isPathDelimiter = character == "/" || character == "\\"
+#else
+            let isPathDelimiter = character == "/"
+#endif
+            if isPathDelimiter {
                 return nil
             } else if character == "." {
                 if startOfLastPathComponent == previousPosition {
@@ -84,10 +112,37 @@ internal extension String {
     }
 
     internal var absolutePath: Bool {
+#if os(Windows)
+        if self.count > 3 {
+            let startIndex = String.Index(encodedOffset:1)
+            let subPath = String(self[startIndex..<self.endIndex])
+
+            if subPath.hasPrefix(":\\") || subPath.hasPrefix(":/") {
+                return true
+            }
+        }
+        return  hasPrefix("\\\\") || hasPrefix("//")
+#else
         return hasPrefix("~") || hasPrefix("/")
+#endif
     }
     
     internal func _stringByAppendingPathComponent(_ str: String, doneAppending : Bool = true) -> String {
+#if os(Windows)
+        if str.isEmpty {
+            return self
+        }
+        if isEmpty {
+            return "\\" + str
+        }
+        if self == "/" {
+            return "\\" + str
+        }
+        if hasSuffix("\\") {
+            return self + str
+        }
+        return self + "\\" + str
+#else
         if str.isEmpty {
             return self
         }
@@ -98,6 +153,7 @@ internal extension String {
             return self + str
         }
         return self + "/" + str
+#endif
     }
     
     internal func _stringByFixingSlashes(compress : Bool = true, stripTrailing: Bool = true) -> String {
@@ -109,6 +165,21 @@ internal extension String {
                 var curPos = startPos
                 
                 while curPos < endPos {
+#if os(Windows)
+                    if characterView[curPos] == "/" || characterView[curPos] == "\\" {
+                        var afterLastSlashPos = curPos
+                        while afterLastSlashPos < endPos && (characterView[afterLastSlashPos] == "/" || characterView[afterLastSlashPos] == "\\") {
+                            afterLastSlashPos = characterView.index(after: afterLastSlashPos)
+                        }
+                        if afterLastSlashPos != characterView.index(after: curPos) {
+                            characterView.replaceSubrange(curPos ..< afterLastSlashPos, with: ["\\"])
+                            endPos = characterView.endIndex
+                        }
+                        curPos = afterLastSlashPos
+                    } else {
+                        curPos = characterView.index(after: curPos)
+                    }
+#else
                     if characterView[curPos] == "/" {
                         var afterLastSlashPos = curPos
                         while afterLastSlashPos < endPos && characterView[afterLastSlashPos] == "/" {
@@ -122,12 +193,19 @@ internal extension String {
                     } else {
                         curPos = characterView.index(after: curPos)
                     }
-                }
+#endif
+               }
             }
         }
+#if os(Windows)
+        if stripTrailing && result.length > 1 && (result.hasSuffix("/") || result.hasSuffix("\\")) {
+            result.remove(at: result.characters.index(before: result.characters.endIndex))
+        }
+#else
         if stripTrailing && result.length > 1 && result.hasSuffix("/") {
             result.remove(at: result.index(before: result.endIndex))
         }
+#endif
         return result
     }
     
@@ -158,7 +236,20 @@ internal extension String {
 public extension NSString {
     
     public var isAbsolutePath: Bool {
+#if os(Windows)
+        if self.length > 3 {
+            let path =  _swiftObject
+            let startIndex = String.Index(encodedOffset:1)
+            let subPath = String(path[startIndex..<path.endIndex])
+
+            if subPath.hasPrefix(":\\") || subPath.hasPrefix(":/") {
+                return true
+            }
+        }
+        return  hasPrefix("\\\\") || hasPrefix("//")
+#else
         return hasPrefix("~") || hasPrefix("/")
+#endif
     }
     
     public static func pathWithComponents(_ components: [String]) -> String {
@@ -187,10 +278,26 @@ public extension NSString {
     
     public var deletingLastPathComponent : String {
         let fixedSelf = _stringByFixingSlashes()
+#if os(Windows)
+        if fixedSelf == "/" || fixedSelf == "\\" {
+            return fixedSelf
+        }
+
+        switch fixedSelf._startOfLastPathComponent {
+        
+        // relative path, single component
+        case fixedSelf.startIndex:
+            return ""
+        
+        // all common cases
+        case let startOfLast:
+            return String(fixedSelf.characters.prefix(upTo: fixedSelf.index(before: startOfLast)))
+        }
+#else
         if fixedSelf == "/" {
             return fixedSelf
         }
-        
+
         switch fixedSelf._startOfLastPathComponent {
         
         // relative path, single component
@@ -205,12 +312,20 @@ public extension NSString {
         case let startOfLast:
             return String(fixedSelf.prefix(upTo: fixedSelf.index(before: startOfLast)))
         }
+#endif
+        
     }
     
     internal func _stringByFixingSlashes(compress : Bool = true, stripTrailing: Bool = true) -> String {
+#if os(Windows)
+        if _swiftObject == "//" || _swiftObject == "\\\\" {
+            return "\\\\"
+        }
+#else
         if _swiftObject == "/" {
             return _swiftObject
         }
+#endif
         
         var result = _swiftObject
         if compress {
@@ -220,6 +335,21 @@ public extension NSString {
                 var curPos = startPos
                 
                 while curPos < endPos {
+#if os(Windows)
+                    if characterView[curPos] == "/" || characterView[curPos] == "\\" {
+                        var afterLastSlashPos = curPos
+                        while afterLastSlashPos < endPos && (characterView[afterLastSlashPos] == "/" || characterView[afterLastSlashPos] == "\\") {
+                            afterLastSlashPos = characterView.index(after: afterLastSlashPos)
+                        }
+                        if afterLastSlashPos != characterView.index(after: curPos) {
+                            characterView.replaceSubrange(curPos ..< afterLastSlashPos, with: ["\\"])
+                            endPos = characterView.endIndex
+                        }
+                        curPos = afterLastSlashPos
+                    } else {
+                        curPos = characterView.index(after: curPos)
+                    }
+#else
                     if characterView[curPos] == "/" {
                         var afterLastSlashPos = curPos
                         while afterLastSlashPos < endPos && characterView[afterLastSlashPos] == "/" {
@@ -233,12 +363,19 @@ public extension NSString {
                     } else {
                         curPos = characterView.index(after: curPos)
                     }
+#endif
                 }
             }
         }
+#if os(Windows)
+        if stripTrailing && (result.hasSuffix("/") || result.hasSuffix("\\")) {
+            result.remove(at: result.characters.index(before: result.characters.endIndex))
+        }
+#else
         if stripTrailing && result.hasSuffix("/") {
             result.remove(at: result.index(before: result.endIndex))
         }
+#endif
         return result
     }
     
@@ -276,10 +413,17 @@ public extension NSString {
     }
     
     public func appendingPathExtension(_ str: String) -> String? {
+#if os(Windows)
+        if str.hasPrefix("/") || str.hasPrefix("\\") || self == "" || self == "/" || self == "\\" {
+            print("Cannot append extension \(str) to path \(self)")
+            return nil
+        }
+#else
         if str.hasPrefix("/") || self == "" || self == "/" {
             print("Cannot append extension \(str) to path \(self)")
             return nil
         }
+#endif
         let result = _swiftObject._stringByFixingSlashes(compress: false, stripTrailing: true) + "." + str
         return result._stringByFixingSlashes()
     }
@@ -289,7 +433,15 @@ public extension NSString {
             return _swiftObject
         }
 
+#if os(Windows)
+        var endOfUserName = _swiftObject.index(of: "/") ?? _swiftObject.endIndex
+
+        if endOfUserName == _swiftObject.endIndex {
+            endOfUserName = _swiftObject.index(of: "\\") ?? _swiftObject.endIndex
+        }
+#else
         let endOfUserName = _swiftObject.index(of: "/") ?? _swiftObject.endIndex
+#endif
         let startOfUserName = _swiftObject.index(after: _swiftObject.startIndex)
         let userName = String(_swiftObject[startOfUserName..<endOfUserName])
         let optUserName: String? = userName.isEmpty ? nil : userName
@@ -300,6 +452,7 @@ public extension NSString {
         
         var result = _swiftObject
         result.replaceSubrange(_swiftObject.startIndex..<endOfUserName, with: homeDir)
+
         result = result._stringByFixingSlashes(compress: false, stripTrailing: true)
         
         return result
@@ -308,9 +461,11 @@ public extension NSString {
     public var standardizingPath: String {
         let expanded = expandingTildeInPath
         var resolved = expanded._bridgeToObjectiveC().resolvingSymlinksInPath
-        
+
+#if !os(Windows)        
         let automount = "/var/automount"
         resolved = resolved._tryToRemovePathPrefix(automount) ?? resolved
+#endif
         return resolved
     }
     
@@ -321,12 +476,20 @@ public extension NSString {
         }
         
         // TODO: pathComponents keeps final path separator if any. Check that logic.
+#if os(Windows)
+        if components.last == "\\" || components.last == "/" {
+            components.removeLast()
+        }
+        
+        let firstComponent = components.first ?? ""
+        let isAbsolutePath = firstComponent == "\\\\" || firstComponent.hasSuffix(":") || firstComponent.hasSuffix(":/") || firstComponent.hasSuffix(":\\")
+#else
         if components.last == "/" {
             components.removeLast()
         }
         
         let isAbsolutePath = components.first == "/"
-        
+#endif
         var resolvedPath = components.removeFirst()
         for component in components {
             switch component {
@@ -344,10 +507,10 @@ public extension NSString {
                 }
             }
         }
-        
+#if !os(Windows)        
         let privatePrefix = "/private"
         resolvedPath = resolvedPath._tryToRemovePathPrefix(privatePrefix) ?? resolvedPath
-        
+#endif   
         return resolvedPath
     }
     
@@ -388,7 +551,11 @@ public extension NSString {
         let commonPath = searchAllFilesInDirectory ? path : _ensureLastPathSeparator(deletingLastPathComponent)
         
         if searchAllFilesInDirectory {
+#if os(Windows)
+            outputName = "\\"
+#else
             outputName = "/"
+#endif
         } else {            
             if let lcp = _longestCommonPrefix(matches, caseSensitive: flag) {
                 outputName = (commonPath + lcp)
@@ -401,9 +568,15 @@ public extension NSString {
     }
 
     internal func _stringIsPathToDirectory(_ path: String) -> Bool {
+#if os(Windows)
+        if !path.hasSuffix("/") && !path.hasSuffix("\\") {
+            return false
+        }
+#else
         if !path.hasSuffix("/") {
             return false
         }
+#endif
         
         var isDirectory: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
@@ -500,11 +673,19 @@ public extension NSString {
     }
     
     internal func _ensureLastPathSeparator(_ path: String) -> String {
+#if os(Windows)
+        if path.hasSuffix("/") || path.hasSuffix("\\") || path.isEmpty {
+            return path
+        }
+        
+        return path + "\\"
+#else
         if path.hasSuffix("/") || path.isEmpty {
             return path
         }
         
         return path + "/"
+#endif
     }
     
     public var fileSystemRepresentation : UnsafePointer<Int8> {
@@ -590,7 +771,11 @@ public func NSUserName() -> String {
 
 internal func _NSCreateTemporaryFile(_ filePath: String) throws -> (Int32, String) {
     let template = "." + filePath + ".tmp.XXXXXX"
+#if CAN_IMPORT_MINGWCRT
+    let maxLength = Int(_MAX_PATH) + 1
+#else
     let maxLength = Int(PATH_MAX) + 1
+#endif
     var buf = [Int8](repeating: 0, count: maxLength)
     let _ = template._nsObject.getFileSystemRepresentation(&buf, maxLength: maxLength)
     let fd = mkstemp(&buf)

@@ -216,14 +216,14 @@ void *__CFConstantStringClassReferencePtr = &__CFConstantStringClassReference;
 #else
 #if !__CONSTANT_CFSTRINGS__ || DEPLOYMENT_TARGET_EMBEDDED_MINI
 // Compiler uses this symbol name; must match compiler built-in decl, so we use 'int'
-#if __LP64__
+#if __LP64__ || __LLP64__
 int __CFConstantStringClassReference[24] = {0};
 #else
 int __CFConstantStringClassReference[12] = {0};
 #endif
 #endif
 
-#if __LP64__
+#if __LP64__ || __LLP64__
 int __CFConstantStringClassReference[24] = {0};
 #else
 int __CFConstantStringClassReference[12] = {0};
@@ -319,7 +319,7 @@ void _CFEnableZombies(void) {
 #define RC_DEALLOCATED_BIT	(0x200000ULL)
 #endif
 
-#if __LP64__
+#if __LP64__ || __LLP64__
 #define HIGH_RC_START 32
 #define HIGH_RC_END 63
 #endif
@@ -339,7 +339,7 @@ CF_INLINE uint16_t __CFLowRCFromInfo(__CFInfoType info) {
     return __CFBitfieldGetValue(info, LOW_RC_END, LOW_RC_START);
 }
 
-#if __LP64__
+#if __LP64__ || __LLP64__
 /// Get the retain count from the high 32-bit field (only present in 64 bit)
 CF_INLINE uint32_t __CFHighRCFromInfo(__CFInfoType info) {
     return __CFBitfield64GetValue(info, HIGH_RC_END, HIGH_RC_START);
@@ -446,7 +446,7 @@ CFTypeRef _CFRuntimeCreateInstance(CFAllocatorRef allocator, CFTypeID typeID, CF
     // No need for atomic operations here - memory is currently private to this thread
     uint32_t typeIDMasked = (uint32_t)typeID << 8;
     uint32_t usesDefaultAllocatorMasked = usesSystemDefaultAllocator ? 0x80 : 0x00;
-#if __LP64__
+#if __LP64__ || __LLP64__
     if (customRC) {
         // The top 32 bits of the word are all FF
         // The rc bits in the lower 32 are 0xFF
@@ -488,7 +488,7 @@ void _CFRuntimeInitStaticInstance(void *ptr, CFTypeID typeID) {
     // No need for atomic operations here - memory is currently private to this thread
     uint32_t typeIDMasked = (uint32_t)typeID << 8;
     uint32_t usesDefaultAllocatorMasked = 0x80;
-#if __LP64__
+#if __LP64__ || __LLP64__
     if (customRC) {
         // The top 32 bits of the word are the retain count
         memory->_cfinfoa = (uint64_t)((0xFFFFFFFFULL << 32) | (uint32_t)((0xFF << 24) | RC_CUSTOM_RC_BIT | typeIDMasked | usesDefaultAllocatorMasked));
@@ -721,7 +721,7 @@ CF_PRIVATE void __CFTypeCollectionRelease(CFAllocatorRef allocator, const void *
     CFRelease(cf);
 }
 
-#if !__LP64__
+#if !__LP64__ && !__LLP64__
 static CFLock_t __CFRuntimeExternRefCountTableLock = CFLockInit;
 #endif
 
@@ -730,7 +730,7 @@ static CFLock_t __CFRuntimeExternRefCountTableLock = CFLockInit;
 #else
 static uint64_t __CFGetFullRetainCount(CFTypeRef cf) {
     if (NULL == cf) { CRSetCrashLogMessage("*** __CFGetFullRetainCount() called with NULL ***"); HALT; }
-#if __LP64__
+#if __LP64__ || __LLP64__
     __CFInfoType info = atomic_load(&(((CFRuntimeBase *)cf)->_cfinfoa));
     uint32_t rc = __CFHighRCFromInfo(info);
     if (0 == rc) {
@@ -755,7 +755,7 @@ static uint64_t __CFGetFullRetainCount(CFTypeRef cf) {
 CF_PRIVATE Boolean __CFRuntimeIsConstant(CFTypeRef cf) {
     __CFInfoType info = atomic_load(&(((CFRuntimeBase *)cf)->_cfinfoa));
     uint32_t rc;
-#if __LP64__
+#if __LP64__ || __LLP64__
     rc = __CFHighRCFromInfo(info);
 #else
     rc = __CFLowRCFromInfo(info);
@@ -767,7 +767,7 @@ CF_PRIVATE Boolean __CFRuntimeIsConstant(CFTypeRef cf) {
 CF_PRIVATE void __CFRuntimeSetRC(CFTypeRef cf, uint32_t rc) {
     // No real need for atomics or CAS here, memory is private to thread so far
     __CFInfoType info = ((CFRuntimeBase *)cf)->_cfinfoa;
-#if __LP64__
+#if __LP64__ || __LLP64__
     __CFBitfield64SetValue(info, HIGH_RC_END, HIGH_RC_START, rc);
 #else
     __CFBitfieldSetValue(info, LOW_RC_END, LOW_RC_START, rc);
@@ -785,14 +785,14 @@ CFIndex CFGetRetainCount(CFTypeRef cf) {
         if (!refcount || !(cfClass->version & _kCFRuntimeCustomRefCount) || __CFLowRCFromInfo(info) != 0xFF) {
             HALT; // bogus object
         }
-#if __LP64__
+#if __LP64__ || __LLP64__
         if (__CFHighRCFromInfo(info) != 0xFFFFFFFFU) {
             CRSetCrashLogMessage("Detected bogus CFTypeRef");
             HALT; // bogus object
         }
 #endif
         uint32_t rc = refcount(0, cf);
-#if __LP64__
+#if __LP64__ || __LLP64__
         return (CFIndex)rc;
 #else
         return (rc < LONG_MAX) ? (CFIndex)rc : (CFIndex)LONG_MAX;
@@ -1180,7 +1180,7 @@ void __CFInitialize(void) {
 #endif
         __CFStreamInitialize();
 #if DEPLOYMENT_TARGET_WINDOWS
-        CFWindowsNamedPipeGetTypeID();
+//        CFWindowsNamedPipeGetTypeID();
 #endif
         
         CFDateGetTypeID();
@@ -1198,6 +1198,13 @@ void __CFInitialize(void) {
 #endif
         
 #if DEPLOYMENT_RUNTIME_SWIFT
+#ifndef __CFInitializeSwift
+#if TARGET_OS_LINUX || TARGET_OS_WINDOWS
+#define __CFInitializeSwift _T010Foundation19__CFInitializeSwiftyyF
+#elif TARGET_OS_MAC
+#define __CFInitializeSwift _T015SwiftFoundation014__CFInitializeA0yyF
+#endif
+#endif
         extern void __CFInitializeSwift(void);
         __CFInitializeSwift();
         __CFNumberInitialize(); /* needs to happen after Swift bridge is initialized */
@@ -1326,7 +1333,7 @@ int DllMain( HINSTANCE hInstance, DWORD dwReason, LPVOID pReserved ) {
     static CFBundleRef cfBundle = NULL;
     if (dwReason == DLL_PROCESS_ATTACH) {
 	__CFInitialize();
-        cfBundle = RegisterCoreFoundationBundle();
+//        cfBundle = RegisterCoreFoundationBundle();
     } else if (dwReason == DLL_PROCESS_DETACH && pReserved == 0) {
         // Only cleanup if we are being unloaded dynamically (pReserved == 0) <rdar://problem/7480873>
         __CFStreamCleanup();
@@ -1371,7 +1378,7 @@ static CFTypeRef _CFRetain(CFTypeRef cf, Boolean tryR) {
             CRSetCrashLogMessage("Detected bogus CFTypeRef");
             HALT; // bogus object
         }
-#if __LP64__
+#if __LP64__ || __LLP64__
         // Custom RC always has high bits all set
         if (__CFHighRCFromInfo(info) != 0xFFFFFFFFU) {
             CRSetCrashLogMessage("Detected bogus CFTypeRef");
@@ -1380,7 +1387,7 @@ static CFTypeRef _CFRetain(CFTypeRef cf, Boolean tryR) {
 #endif
         refcount(+1, cf);
     } else {
-#if __LP64__
+#if __LP64__ || __LLP64__
         __CFInfoType newInfo;
         do {
             if (__builtin_expect(tryR && (info & (RC_DEALLOCATING_BIT | RC_DEALLOCATED_BIT)), false)) {
@@ -1489,7 +1496,7 @@ static void _CFRelease(CFTypeRef CF_RELEASES_ARGUMENT cf) {
             CRSetCrashLogMessage("Detected bogus CFTypeRef");
             HALT; // bogus object
         }
-#if __LP64__
+#if __LP64__ || __LLP64__
         if (__CFHighRCFromInfo(info) != 0xFFFFFFFFU) {
             CRSetCrashLogMessage("Detected bogus CFTypeRef");
             HALT; // bogus object
@@ -1497,7 +1504,7 @@ static void _CFRelease(CFTypeRef CF_RELEASES_ARGUMENT cf) {
 #endif
         refcount(-1, cf);
     } else {
-#if __LP64__
+#if __LP64__ || __LLP64__
         uint32_t rc;
         __CFInfoType newInfo;
     again:;
@@ -1695,6 +1702,19 @@ const char *_NSPrintForDebugger(void *cf) {
     }
 }
  
+#if defined(__MINGW32__) || defined(__CYGWIN__)
+// FIXME: This fucntion was removed at https://github.com/apple/swift-corelibs-foundation/pull/1090 
+//        Until libdispatch is ported and replace this, we need this function.
+// For CF functions with 'Get' semantics, the compiler currently assumes that the result is autoreleased and must be retained. It does so on all platforms by emitting a call to objc_retainAutoreleasedReturnValue. On Darwin, this is implemented by the ObjC runtime. On Linux, there is no runtime, and therefore we have to stub it out here ourselves. The compiler will eventually call swift_release to balance the retain below. This is a workaround until the compiler no longer emits this callout on Linux.
+void * objc_retainAutoreleasedReturnValue(void *obj) {
+    if (obj) {
+        swift_retain(obj);
+        return obj;
+    }
+    else return NULL;
+}
+#endif    
+
 CFHashCode __CFHashDouble(double d) {
     return _CFHashDouble(d);
 }

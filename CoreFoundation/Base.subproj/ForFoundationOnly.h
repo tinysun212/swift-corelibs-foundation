@@ -52,6 +52,8 @@ CF_IMPLICIT_BRIDGING_DISABLED
 #elif DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
 #include <malloc/malloc.h>
 #include <mach/mach_time.h>
+#elif DEPLOYMENT_TARGET_WINDOWS
+#include <sys/stat.h>
 #endif
 
 #if (INCLUDE_OBJC || DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_WINDOWS) && !DEPLOYMENT_RUNTIME_SWIFT
@@ -110,7 +112,7 @@ typedef struct {
     CFTypeRef _Null_unspecified 	(*_Null_unspecified fetchValue)(CFTypeRef context, void *domain, CFStringRef key); // Caller releases
     void	(*_Null_unspecified writeValue)(CFTypeRef context, void *domain, CFStringRef key, CFTypeRef value);
     Boolean	(*_Null_unspecified synchronize)(CFTypeRef context, void *domain);
-    void	(*_Null_unspecified getKeysAndValues)(CFAllocatorRef _Nullable alloc, CFTypeRef context, void *domain, void *_Null_unspecified * _Null_unspecified buf[_Null_unspecified], CFIndex *numKeyValuePairs);
+    void	(*_Null_unspecified getKeysAndValues)(CFAllocatorRef _Nullable alloc, CFTypeRef context, void *domain, void *_Null_unspecified * _Null_unspecified * _Null_unspecified buf, CFIndex *numKeyValuePairs);
     CFDictionaryRef _Null_unspecified  (*_Null_unspecified copyDomainDictionary)(CFTypeRef context, void *domain);
     /* HACK - see comment on _CFPreferencesDomainSetIsWorldReadable(), below */
     void	(*setIsWorldReadable)(CFTypeRef context, void *domain, Boolean isWorldReadable);
@@ -487,6 +489,12 @@ CF_EXPORT int _NS_open(const char *name, int oflag, int pmode);
 CF_EXPORT int _NS_mkstemp(char *name, int bufSize);
 #endif
 
+#if TARGET_OS_WINDOWS
+CF_EXPORT int fsync(int fd);
+CF_EXPORT int pipe(int * _Nonnull pipefd); // pipefd[2]
+CF_EXPORT int fchmod(int fd, mode_t mode);
+#endif
+
 _CF_EXPORT_SCOPE_END
 
 // ---- Miscellaneous material ----------------------------------------
@@ -555,10 +563,17 @@ CF_CROSS_PLATFORM_EXPORT void _CFNumberInitInt16(CFNumberRef result, int16_t val
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitUInt16(CFNumberRef result, uint16_t value);
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitInt32(CFNumberRef result, int32_t value);
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitUInt32(CFNumberRef result, uint32_t value);
+#if __LLP64__
+CF_SWIFT_EXPORT void _CFNumberInitInt(CFNumberRef result, long long value);
+CF_SWIFT_EXPORT void _CFNumberInitUInt(CFNumberRef result, unsigned long long value);
+CF_SWIFT_EXPORT void _CFNumberInitInt64(CFNumberRef result, long long value);
+CF_SWIFT_EXPORT void _CFNumberInitUInt64(CFNumberRef result, unsigned long long value);
+#else
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitInt(CFNumberRef result, long value);
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitUInt(CFNumberRef result, unsigned long value);
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitInt64(CFNumberRef result, int64_t value);
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitUInt64(CFNumberRef result, uint64_t value);
+#endif
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitFloat(CFNumberRef result, float value);
 CF_CROSS_PLATFORM_EXPORT void _CFNumberInitDouble(CFNumberRef result, double value);
 

@@ -405,18 +405,18 @@ CF_EXPORT void * __CFConstantStringClassReferencePtr;
 
 CF_EXPORT void *__CFConstantStringClassReference[];
 
-#if DEPLOYMENT_TARGET_LINUX
+#if DEPLOYMENT_TARGET_LINUX || DEPLOYMENT_TARGET_WINDOWS
 #define CONST_STRING_SECTION __attribute__((section(".cfstr.data")))
 #else
 #define CONST_STRING_SECTION
 #endif
 
 #define CONST_STRING_DECL(S, V) \
-const struct __CFConstStr __##S CONST_STRING_SECTION = {{(uintptr_t)&__CFConstantStringClassReference, _CF_CONSTANT_OBJECT_STRONG_RC, 0, 0x000007c8U}, (uint8_t *)(V), sizeof(V) - 1}; \
+struct __CFConstStr __##S CONST_STRING_SECTION = {{(uintptr_t)&__CFConstantStringClassReference, _CF_CONSTANT_OBJECT_STRONG_RC, 0, 0x000007c8U}, (uint8_t *)(V), sizeof(V) - 1}; \
 const CFStringRef S = (CFStringRef)&__##S;
 
 #define PE_CONST_STRING_DECL(S, V) \
-const static struct __CFConstStr __##S CONST_STRING_SECTION = {{(uintptr_t)&__CFConstantStringClassReference, _CF_CONSTANT_OBJECT_STRONG_RC, 0, 0x000007c8U}, (uint8_t *)(V), sizeof(V) - 1}; \
+static struct __CFConstStr __##S CONST_STRING_SECTION = {{(uintptr_t)&__CFConstantStringClassReference, _CF_CONSTANT_OBJECT_STRONG_RC, 0, 0x000007c8U}, (uint8_t *)(V), sizeof(V) - 1}; \
 CF_PRIVATE const CFStringRef S = (CFStringRef)&__##S;
 
 
@@ -596,7 +596,7 @@ static _Bool __os_warn_unused(_Bool x) { return x; }
 
 #if !__HAS_DISPATCH__
 
-typedef volatile long dispatch_once_t;
+typedef volatile intptr_t dispatch_once_t;
 CF_PRIVATE void _CF_dispatch_once(dispatch_once_t *, void (^)(void));
 #define dispatch_once _CF_dispatch_once
 
@@ -862,14 +862,15 @@ CF_PRIVATE bool __CFBinaryPlistIsArray(const uint8_t *databytes, uint64_t datale
 
 // These are replacements for pthread calls on Windows
 CF_EXPORT int _NS_pthread_main_np();
-CF_EXPORT int _NS_pthread_setspecific(pthread_key_t key, const void *val);
-CF_EXPORT void* _NS_pthread_getspecific(pthread_key_t key);
+//CF_EXPORT int _NS_pthread_setspecific(pthread_key_t key, const void *val);
+//CF_EXPORT void* _NS_pthread_getspecific(pthread_key_t key);
 CF_EXPORT int _NS_pthread_key_init_np(int key, void (*destructor)(void *));
 CF_EXPORT void _NS_pthread_setname_np(const char *name);
 
 // map use of pthread_set/getspecific to internal API
-#define pthread_setspecific _NS_pthread_setspecific
-#define pthread_getspecific _NS_pthread_getspecific
+// MinGW: pthread_setspecific, pthread_getspecific are implented in winpthread.dll
+//#define pthread_setspecific _NS_pthread_setspecific
+//#define pthread_getspecific _NS_pthread_getspecific
 #define pthread_key_init_np _NS_pthread_key_init_np
 #define pthread_main_np _NS_pthread_main_np
 #define pthread_setname_np _NS_pthread_setname_np
@@ -897,7 +898,9 @@ CF_PRIVATE const wchar_t *_CFDLLPath(void);
 #define CFMaxPathLength ((CFIndex)260)
 #define PATH_SEP '\\'
 #define PATH_SEP_STR CFSTR("\\")
+#ifndef PATH_MAX
 #define PATH_MAX MAX_PATH
+#endif //PATH_MAX
 #else
 /// Use this constant for the size (in characters) of a buffer in which to hold a path. This size adds space for at least a couple of null terminators at the end of a buffer into which you copy up to kCFMaxPathLength characters.
 #define CFMaxPathSize ((CFIndex)1026)

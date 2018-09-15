@@ -883,7 +883,7 @@ CF_EXPORT void _CFBundleSetDefaultLocalization(CFStringRef localizationName) {
 CF_PRIVATE CFArrayRef _CFBundleCopyLanguageSearchListInBundle(CFBundleRef bundle) {
     if (!bundle->_searchLanguages) {
 #if DEPLOYMENT_TARGET_WINDOWS
-        if (_defaultLocalization) CFArrayAppendValue(langs, _defaultLocalization);
+//        if (_defaultLocalization) CFArrayAppendValue(langs, _defaultLocalization);
 #endif
         // includes predefined localizations
         CFArrayRef localizationsForBundle = CFBundleCopyBundleLocalizations(bundle);

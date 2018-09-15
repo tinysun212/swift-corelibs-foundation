@@ -11,9 +11,9 @@
 #include "CFBasicHash.h"
 #include <CoreFoundation/CFRuntime.h>
 #include <CoreFoundation/CFSet.h>
-#include <Block.h>
 #include <math.h>
 #if __HAS_DISPATCH__
+#include <Block.h>
 #include <dispatch/dispatch.h>
 #endif
 

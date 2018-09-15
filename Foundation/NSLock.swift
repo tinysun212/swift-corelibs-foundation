@@ -10,8 +10,12 @@
 
 #if os(OSX) || os(iOS)
 import Darwin
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
 import Glibc
+#elseif os(Cygwin)
+import Newlib
+#elseif CAN_IMPORT_MINGWCRT
+import MinGWCrt
 #endif
 
 import CoreFoundation
@@ -21,7 +25,7 @@ public protocol NSLocking {
     func unlock()
 }
 
-#if CYGWIN
+#if os(Cygwin) || CAN_IMPORT_MINGWCRT
 private typealias _PthreadMutexPointer = UnsafeMutablePointer<pthread_mutex_t?>
 private typealias _PthreadCondPointer = UnsafeMutablePointer<pthread_cond_t?>
 #else
@@ -183,7 +187,7 @@ open class NSRecursiveLock: NSObject, NSLocking {
 
     public override init() {
         super.init()
-#if CYGWIN
+#if os(Cygwin)
         var attrib : pthread_mutexattr_t? = nil
 #else
         var attrib = pthread_mutexattr_t()
@@ -295,8 +299,13 @@ private func timeSpecFrom(date: Date) -> timespec? {
     let interval = date.timeIntervalSince1970
     let intervalNS = Int64(interval * Double(nsecPerSec))
 
+#if CAN_IMPORT_MINGWCRT
+    return timespec(tv_sec: Int64(intervalNS / nsecPerSec),
+                    tv_nsec: CLong(intervalNS % nsecPerSec))
+#else
     return timespec(tv_sec: Int(intervalNS / nsecPerSec),
                     tv_nsec: Int(intervalNS % nsecPerSec))
+#endif
 }
 
 #if os(OSX) || os(iOS)

@@ -96,6 +96,8 @@ open class NSRegularExpression: NSObject, NSCopying, NSCoding {
     open var options: Options {
 #if os(OSX) || os(iOS)
         let opt = _CFRegularExpressionGetOptions(_internal).rawValue
+#elseif CAN_IMPORT_MINGWCRT && arch(x86_64)
+        let opt = UInt(_CFRegularExpressionGetOptions(_internal))
 #else
         let opt = _CFRegularExpressionGetOptions(_internal)
 #endif
@@ -154,6 +156,8 @@ internal func _NSRegularExpressionMatch(_ context: UnsafeMutableRawPointer?, ran
     if ranges == nil {
 #if os(OSX) || os(iOS)
         let opts = options.rawValue
+#elseif CAN_IMPORT_MINGWCRT && arch(x86_64)
+        let opts = UInt(options)
 #else
         let opts = options
 #endif
@@ -166,6 +170,8 @@ internal func _NSRegularExpressionMatch(_ context: UnsafeMutableRawPointer?, ran
         }
 #if os(OSX) || os(iOS)
         let flags = NSRegularExpression.MatchingFlags(rawValue: options.rawValue)
+#elseif CAN_IMPORT_MINGWCRT && arch(x86_64)
+        let flags = NSRegularExpression.MatchingFlags(rawValue: UInt(options))
 #else
         let flags = NSRegularExpression.MatchingFlags(rawValue: options)
 #endif

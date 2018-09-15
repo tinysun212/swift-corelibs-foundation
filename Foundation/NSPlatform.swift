@@ -11,12 +11,18 @@
 import Darwin
 #elseif os(Linux)
 import Glibc
+#elseif CAN_IMPORT_MINGWCRT
+import MinGWCrt
 #endif
+
+import CoreFoundation
 
 #if os(OSX) || os(iOS)
 fileprivate let _NSPageSize = Int(vm_page_size)
-#elseif os(Linux) || os(Android)
+#elseif os(Linux) || os(Android) || os(Cygwin)
 fileprivate let _NSPageSize = Int(getpagesize())
+#elseif CAN_IMPORT_MINGWCRT
+fileprivate let _NSPageSize = Int(CFPageSize())
 #endif
 
 public func NSPageSize() -> Int {

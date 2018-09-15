@@ -18,16 +18,51 @@ if Configuration.current.target.sdk == OSType.Linux:
 	foundation.CFLAGS = '-DDEPLOYMENT_TARGET_LINUX -D_GNU_SOURCE -DCF_CHARACTERSET_DATA_DIR="CoreFoundation/CharacterSets"'
 	foundation.LDFLAGS = '${SWIFT_USE_LINKER} -Wl,@./CoreFoundation/linux.ld -lswiftGlibc -Wl,-Bsymbolic '
 	Configuration.current.requires_pkg_config = True
+	swift_cflags += [
+		'-I${BUILD_DIR}/Foundation/usr/lib/swift',
+		'-I${SYSROOT}/usr/include',
+		'-I${SYSROOT}/usr/include/libxml2',
+		'-I${SYSROOT}/usr/include/curl'
+	]
 elif Configuration.current.target.sdk == OSType.FreeBSD:
 	foundation.CFLAGS = '-DDEPLOYMENT_TARGET_FREEBSD -I/usr/local/include -I/usr/local/include/libxml2 -I/usr/local/include/curl '
 	foundation.LDFLAGS = ''
+	swift_cflags += [
+		'-I${BUILD_DIR}/Foundation/usr/lib/swift',
+		'-I${SYSROOT}/usr/include',
+		'-I${SYSROOT}/usr/include/libxml2',
+		'-I${SYSROOT}/usr/include/curl'
+	]
 elif Configuration.current.target.sdk == OSType.MacOSX:
 	foundation.CFLAGS = '-DDEPLOYMENT_TARGET_MACOSX '
 	foundation.LDFLAGS = '-licucore -twolevel_namespace -Wl,-alias_list,CoreFoundation/Base.subproj/DarwinSymbolAliases -sectcreate __UNICODE __csbitmaps CoreFoundation/CharacterSets/CFCharacterSetBitmaps.bitmap -sectcreate __UNICODE __properties CoreFoundation/CharacterSets/CFUniCharPropertyDatabase.data -sectcreate __UNICODE __data CoreFoundation/CharacterSets/CFUnicodeData-L.mapping -segprot __UNICODE r r '
+	swift_cflags += [
+		'-I${BUILD_DIR}/Foundation/usr/lib/swift',
+		'-I${SYSROOT}/usr/include',
+		'-I${SYSROOT}/usr/include/libxml2',
+		'-I${SYSROOT}/usr/include/curl'
+	]
 elif Configuration.current.target.sdk == OSType.Win32 and Configuration.current.target.environ == EnvironmentType.Cygnus:
 	foundation.CFLAGS = '-DDEPLOYMENT_TARGET_LINUX -D_GNU_SOURCE -mcmodel=large '
-	foundation.LDFLAGS = '${SWIFT_USE_LINKER} -lswiftGlibc `icu-config --ldflags` -Wl,--allow-multiple-definition '
-	swift_cflags += ['-DCYGWIN']
+	foundation.LDFLAGS = '${SWIFT_USE_LINKER} -lswiftNewlib `icu-config --ldflags` -Wl,-defsym,__CFConstantStringClassReference=_T010Foundation19_NSCFConstantStringCN,--allow-multiple-definition '
+	swift_cflags += [
+		'-DCYGWIN',
+		'-I${BUILD_DIR}/Foundation/usr/lib/swift',
+		'-I${SYSROOT}/usr/include',
+		'-I${SYSROOT}/usr/include/libxml2',
+		'-I${SYSROOT}/usr/include/curl'
+	]
+elif Configuration.current.target.sdk == OSType.Win32 and Configuration.current.target.environ == EnvironmentType.GNU:
+	foundation.CFLAGS = '-DDEPLOYMENT_TARGET_WINDOWS -D_GNU_SOURCE -mcmodel=large -I/mingw64/include/libxml2 -I/mingw64/include/curl '
+	foundation.LDFLAGS = '${SWIFT_USE_LINKER} -lswiftMinGwCrt `icu-config --ldflags` -Wl,-defsym,__CFConstantStringClassReference=_T010Foundation19_NSCFConstantStringCN,--allow-multiple-definition '
+	swift_cflags += [
+		'-DMINGW',
+		'-DCAN_IMPORT_MINGWCRT',
+		'-I${BUILD_DIR}/Foundation/usr/lib/swift',
+		'-I/mingw64/include',
+		'-I/mingw64/include/libxml2',
+		'-I/mingw64/include/curl'
+	]
 
 if Configuration.current.build_mode == Configuration.Debug:
         foundation.LDFLAGS += ' -lswiftSwiftOnoneSupport '
@@ -61,6 +96,8 @@ foundation.CFLAGS += " ".join([
 	'-Wno-unused-variable',
 	'-Wno-int-conversion',
 	'-Wno-unused-function',
+	'-I${SYSROOT}/usr/include/libxml2',
+	'-I${SYSROOT}/usr/include/curl',
 	'-I./',
 ])
 
@@ -230,7 +267,14 @@ project = [
 
 foundation.add_phase(headers)
 
-sources = CompileSources([
+# This code is already in libdispatch so is only needed if libdispatch is
+# NOT being used
+if "LIBDISPATCH_SOURCE_DIR" not in Configuration.current.variables:
+    comp_sources = (['closure/data.c', 'closure/runtime.c'])
+else:
+    comp_sources = []
+
+sources = CompileSources(comp_sources + [
     'uuid/uuid.c',
 	# 'CoreFoundation/AppServices.subproj/CFUserNotification.c',
 	'CoreFoundation/Base.subproj/CFBase.c',
@@ -241,6 +285,7 @@ sources = CompileSources([
 	'CoreFoundation/Base.subproj/CFSystemDirectories.c',
 	'CoreFoundation/Base.subproj/CFUtilities.c',
 	'CoreFoundation/Base.subproj/CFUUID.c',
+	'CoreFoundation/Base.subproj/CFWindowsUtilities.c',
 	'CoreFoundation/Collections.subproj/CFArray.c',
 	'CoreFoundation/Collections.subproj/CFBag.c',
 	'CoreFoundation/Collections.subproj/CFBasicHash.c',
@@ -323,14 +368,13 @@ sources = CompileSources([
 	'CoreFoundation/URL.subproj/CFURLSessionInterface.c',
 ])
 
-# This code is already in libdispatch so is only needed if libdispatch is
-# NOT being used
-if "LIBDISPATCH_SOURCE_DIR" not in Configuration.current.variables:
-    sources += (['closure/data.c', 'closure/runtime.c'])
-
 sources.add_dependency(headers)
 foundation.add_phase(sources)
 
+# FIXME: MinGW
+#   Some sources are commented, because the Dispatch module is not implemented.
+#   '##' : uses Dispatch module (5 files)
+#   '# ' : uses the class/function which is defined in '##' (12 files)
 swift_sources = CompileSwiftSources([
 	'Foundation/NSObject.swift',
 	'Foundation/AffineTransform.swift',
@@ -369,7 +413,7 @@ swift_sources = CompileSwiftSources([
 	'Foundation/NSGeometry.swift',
 	'Foundation/Host.swift',
 	'Foundation/HTTPCookie.swift',
-	'Foundation/HTTPCookieStorage.swift',
+	# 'Foundation/HTTPCookieStorage.swift',
 	'Foundation/NSIndexPath.swift',
 	'Foundation/NSIndexSet.swift',
 	'Foundation/ISO8601DateFormatter.swift',
@@ -420,29 +464,29 @@ swift_sources = CompileSwiftSources([
 	'Foundation/NSTimeZone.swift',
 	'Foundation/NSURL.swift',
 	'Foundation/URLAuthenticationChallenge.swift',
-	'Foundation/URLCache.swift',
+	#'Foundation/URLCache.swift',
 	'Foundation/URLCredential.swift',
-	'Foundation/URLCredentialStorage.swift',
+	#'Foundation/URLCredentialStorage.swift',
 	'Foundation/NSURLError.swift',
 	'Foundation/URLProtectionSpace.swift',
-	'Foundation/URLProtocol.swift',
-	'Foundation/NSURLRequest.swift',
-	'Foundation/URLResponse.swift',
-	'Foundation/URLSession/Configuration.swift',
-	'Foundation/URLSession/libcurl/EasyHandle.swift',
-	'Foundation/URLSession/BodySource.swift',
-	'Foundation/URLSession/Message.swift',
-	'Foundation/URLSession/http/HTTPMessage.swift',
-	'Foundation/URLSession/libcurl/MultiHandle.swift',
-	'Foundation/URLSession/URLSession.swift',
-	'Foundation/URLSession/URLSessionConfiguration.swift',
-	'Foundation/URLSession/URLSessionDelegate.swift',
-	'Foundation/URLSession/URLSessionTask.swift',
-	'Foundation/URLSession/TaskRegistry.swift',
-	'Foundation/URLSession/NativeProtocol.swift',
-	'Foundation/URLSession/TransferState.swift',
-	'Foundation/URLSession/libcurl/libcurlHelpers.swift',
-    'Foundation/URLSession/http/HTTPURLProtocol.swift',
+	#'Foundation/URLProtocol.swift',
+	#'Foundation/NSURLRequest.swift',
+	#'Foundation/URLResponse.swift',
+	#'Foundation/URLSession/Configuration.swift',
+	#'Foundation/URLSession/libcurl/EasyHandle.swift',
+	#'Foundation/URLSession/BodySource.swift',
+	#'Foundation/URLSession/Message.swift',
+	#'Foundation/URLSession/http/HTTPMessage.swift',
+	#'Foundation/URLSession/libcurl/MultiHandle.swift',
+	#'Foundation/URLSession/URLSession.swift',
+	#'Foundation/URLSession/URLSessionConfiguration.swift',
+	#'Foundation/URLSession/URLSessionDelegate.swift',
+	#'Foundation/URLSession/URLSessionTask.swift',
+	#'Foundation/URLSession/TaskRegistry.swift',
+	#'Foundation/URLSession/NativeProtocol.swift',
+	#'Foundation/URLSession/TransferState.swift',
+	#'Foundation/URLSession/libcurl/libcurlHelpers.swift',
+	#'Foundation/URLSession/http/HTTPURLProtocol.swift',
 	'Foundation/UserDefaults.swift',
 	'Foundation/NSUUID.swift',
 	'Foundation/NSValue.swift',
@@ -521,7 +565,7 @@ foundation_tests = SwiftExecutable('TestFoundation', [
         'Foundation/ProgressFraction.swift',
 ] + glob.glob('./TestFoundation/Test*.swift')) # all TestSomething.swift are considered sources to the test project in the TestFoundation directory
 
-Configuration.current.extra_ld_flags += ' -L'+Configuration.current.variables["LIBDISPATCH_BUILD_DIR"]+'/src/.libs'
+#Configuration.current.extra_ld_flags += ' -L'+Configuration.current.variables["LIBDISPATCH_BUILD_DIR"]+'/src/.libs'
 
 foundation_tests.add_dependency(foundation_tests_resources)
 xdgTestHelper = SwiftExecutable('xdgTestHelper',

@@ -345,6 +345,8 @@ class Target:
             self.executable_suffix = ".exe"
             if "cygnus" in triple:
                 self.environ = EnvironmentType.Cygnus
+            elif "-gnu" in triple:
+                self.environ = EnvironmentType.GNU
             else:
                 self.environ = EnvironmentType.UnknownEnvironment
         elif "darwin" in triple:
@@ -371,8 +373,10 @@ class Target:
         elif platform.system() == "FreeBSD":
             # Make this work on 10 as well.
             triple += "-freebsd11.0"
-        elif platform.system() == "CYGWIN_NT-10.0":
+        elif platform.system().startswith("CYGWIN"):
             triple += "-windows-cygnus"
+        elif platform.system().startswith("MINGW"):
+            triple += "-windows-gnu"
         else:
             # TODO: This should be a bit more exhaustive
             print("unknown host os")
@@ -397,6 +401,8 @@ class Target:
             triple += "-unknown-freebsd"
         elif self.sdk == OSType.Win32 and self.environ == EnvironmentType.Cygnus:
             triple += "-unknown-windows-cygnus"
+        elif self.sdk == OSType.Win32 and self.environ == EnvironmentType.GNU:
+            triple += "-unknown-windows-gnu"
         else:
             print("unknown sdk for swift")
             return None
@@ -413,8 +419,12 @@ class Target:
             return "linux"
         elif self.sdk == OSType.FreeBSD:
             return "freebsd"
+        elif self.sdk == OSType.Win32 and self.environ == EnvironmentType.Cygnus:
+           return "cygwin"
+        elif self.sdk == OSType.Win32 and self.environ == EnvironmentType.GNU:
+           return "mingw"
         elif self.sdk == OSType.Win32:
-            return "cygwin"
+           return "windows"
         else:
             print("unknown sdk for swift")
             return None

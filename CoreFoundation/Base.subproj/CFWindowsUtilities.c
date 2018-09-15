@@ -89,11 +89,21 @@ void OSMemoryBarrier() {
 }
 
 void _CFGetFrameworkPath(wchar_t *path, int maxLength) {
+
+#if DEPLOYMENT_RUNTIME_SWIFT
+    //using Foundation shared library instead CoreFoundation  for Swift
+#if defined(__MINGW32__) || defined(__MINGW64__)
+    wchar_t *DLLFileName = L"libFoundation.dll";
+#else
+    wchar_t *DLLFileName = L"Foundation.dll";
+#endif
+#else
 #ifdef _DEBUG
     // might be nice to get this from the project file at some point
     wchar_t *DLLFileName = L"CoreFoundation_debug.dll";
 #else
     wchar_t *DLLFileName = L"CoreFoundation.dll";
+#endif
 #endif
     path[0] = path[1] = 0;
     DWORD wResult;
@@ -115,6 +125,21 @@ void _CFGetFrameworkPath(wchar_t *path, int maxLength) {
     }
 }
 
+CFStringRef _CFGetWindowsAppleSystemLibraryDirectory(void) {
+    // TODO: Detecting Swift runtime environment and the system directory
+    return CFSTR("C:\\Swift");
+}
 
+void timeradd(struct timeval *a, struct timeval *b,
+                     struct timeval *res) {
+    res->tv_sec = a->tv_sec + b->tv_sec;
+    res->tv_usec = a->tv_usec + b->tv_usec;
+    if (res->tv_usec >= 1000000)
+    {
+        res->tv_sec += 1;
+        res->tv_usec -= 1000000;
+    }
+}
+		  
 #endif
 

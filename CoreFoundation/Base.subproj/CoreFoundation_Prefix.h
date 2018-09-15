@@ -57,7 +57,9 @@ extern "C" {
 #if INCLUDE_OBJC
 #include <objc/objc.h>
 #else
+#if !defined(DEPLOYMENT_TARGET_WINDOWS)
 typedef signed char	BOOL; 
+#endif
 typedef char * id;
 typedef char * Class;
 #ifndef YES
@@ -274,6 +276,7 @@ void OSMemoryBarrier();
 #endif
 
 #if DEPLOYMENT_TARGET_WINDOWS
+#define HAVE_STRUCT_TIMESPEC 1
 
 #define MAXPATHLEN MAX_PATH
 #undef MAX_PATH
@@ -288,7 +291,8 @@ void OSMemoryBarrier();
 #define CF_PRIVATE extern
     
 #define __builtin_expect(P1,P2) P1
-    
+
+#if 0    
 // These are replacements for POSIX calls on Windows, ensuring that the UTF8 parameters are converted to UTF16 before being passed to Windows
 CF_EXPORT int _NS_stat(const char *name, struct _stat *st);
 CF_EXPORT int _NS_mkdir(const char *name);
@@ -298,10 +302,11 @@ CF_EXPORT int _NS_unlink(const char *name);
 CF_EXPORT char *_NS_getcwd(char *dstbuf, size_t size);     // Warning: this doesn't support dstbuf as null even though 'getcwd' does
 CF_EXPORT char *_NS_getenv(const char *name);
 CF_EXPORT int _NS_rename(const char *oldName, const char *newName);
-CF_EXPORT int _NS_open(const char *name, int oflag, int pmode = 0);
+CF_EXPORT int _NS_open(const char *name, int oflag, int pmode);
 CF_EXPORT int _NS_chdir(const char *name);
 CF_EXPORT int _NS_mkstemp(char *name, int bufSize);
 CF_EXPORT int _NS_access(const char *name, int amode);
+#endif
 
 #define BOOL WINDOWS_BOOL
 
@@ -346,9 +351,9 @@ typedef int gid_t;
 #define getuid() 0
 #define getegid() 0
 
-#define scalbn(A, B) _scalb(A, B)
+//#define scalbn(A, B) _scalb(A, B)
 
-#define fsync(a) _commit(a)
+//#define fsync(a) _commit(a)
 #define malloc_create_zone(a,b) 123
 #define malloc_set_zone_name(zone,name)
 #define malloc_zone_realloc(zone,ptr,size) realloc(ptr,size)
@@ -378,10 +383,12 @@ CF_INLINE uint64_t mach_absolute_time() {
     return (uint64_t)count.QuadPart;
 }
 
+#if !defined(__MINGW32__)
 CF_INLINE long long llabs(long long v) {
     if (v < 0) return -v;
     return v;
 }
+#endif
 
 #define strtod_l(a,b,locale) strtod(a,b)
 #define strtoul_l(a,b,c,locale) strtoul(a,b,c)
@@ -471,11 +478,13 @@ CF_EXPORT int64_t OSAtomicAdd64Barrier( int64_t __theAmount, volatile int64_t *_
 
 #include <stdarg.h>
 
+#if !TARGET_OS_CYGWIN
 CF_INLINE int flsl( long mask ) {
     int idx = 0;
     while (mask != 0) mask = (unsigned long)mask >> 1, idx++;
     return idx;
 }
+#endif
     
 CF_INLINE int popcountll(long long x) {
     int count = 0;

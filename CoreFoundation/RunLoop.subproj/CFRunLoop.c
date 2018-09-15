@@ -24,9 +24,8 @@
 #define cf_trace(...)
 
 
-
 #if DEPLOYMENT_TARGET_WINDOWS
-#include <typeinfo.h>
+//#include <typeinfo.h>
 #endif
 
 #if __has_include(<checkint.h>)
@@ -70,6 +69,7 @@ extern void os_release(void *object);
 extern mach_port_t _dispatch_get_main_queue_port_4CF(void);
 
 #elif DEPLOYMENT_TARGET_WINDOWS || TARGET_OS_CYGWIN
+#include <windows.h>
 #include <process.h>
 DISPATCH_EXPORT HANDLE _dispatch_get_main_queue_handle_4CF(void);
 DISPATCH_EXPORT void _dispatch_main_queue_callback_4CF(void);
@@ -101,7 +101,11 @@ CF_EXPORT pthread_t _CF_pthread_main_thread_np(void);
 #define pthread_main_thread_np() _CF_pthread_main_thread_np()
 #endif
 
+#if __has_include(<Block.h>)
 #include <Block.h>
+#elif __has_include("../../closure/Block.h")
+#include "../../closure/Block.h"
+#endif
 #if __has_include(<Block_private.h>)
 #include <Block_private.h>
 #elif __has_include("Block_private.h")
@@ -131,7 +135,7 @@ static void _runLoopTimerWithBlockContext(CFRunLoopTimerRef timer, void *opaqueB
 #if DEPLOYMENT_TARGET_WINDOWS
 
 static pthread_t kNilPthreadT = { nil, nil };
-#define pthreadPointer(a) a.p
+#define pthreadPointer(a) ((void*)a)
 typedef	int kern_return_t;
 #define KERN_SUCCESS 0
 

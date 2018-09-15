@@ -28,6 +28,15 @@
 #include <WinIoCtl.h>
 
 #define getcwd _NS_getcwd
+#define close _close
+#define write _write
+#define read _read
+#define open _NS_open
+#define stat _NS_stat
+#define fstat _fstat
+#define mkdir(a,b) _NS_mkdir(a)
+#define rmdir _NS_rmdir
+#define unlink _NS_unlink
 
 #endif
 
@@ -156,6 +165,11 @@ const char *_CFProcessPath(void) {
 #endif
 
 #if DEPLOYMENT_TARGET_LINUX
+#if TARGET_OS_CYGWIN
+Boolean _CFIsMainThread(void) {
+    return 1;
+}
+#else
 #include <unistd.h>
 #if __has_include(<syscall.h>)
 #include <syscall.h>
@@ -166,7 +180,17 @@ const char *_CFProcessPath(void) {
 Boolean _CFIsMainThread(void) {
     return syscall(SYS_gettid) == getpid();
 }
+#endif
+#endif
 
+#if DEPLOYMENT_TARGET_WINDOWS
+Boolean _CFIsMainThread(void) {
+    // FIXME: Not implemented for MinGW.
+    return 1;
+}
+#endif
+
+#if DEPLOYMENT_TARGET_LINUX
 const char *_CFProcessPath(void) {
     if (__CFProcessPath) return __CFProcessPath;
     char buf[CFMaxPathSize + 1];
@@ -502,28 +526,15 @@ typedef struct tagTHREADNAME_INFO
 #pragma pack(pop)
 
 CF_EXPORT void _NS_pthread_setname_np(const char *name) {
-    THREADNAME_INFO info;
-    info.dwType = 0x1000;
-    info.szName = name;
-    info.dwThreadID = GetCurrentThreadId();
-    info.dwFlags = 0;
-
-    __try
-    {
-        RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
-    }
-    __except(EXCEPTION_EXECUTE_HANDLER)
-    {
-    }
+    pthread_setname_np(name);
 }
 
-static pthread_t __initialPthread = { NULL, 0 };
+static pthread_t __initialPthread = NULL;
 
 CF_EXPORT int _NS_pthread_main_np() {
     pthread_t me = pthread_self();
-    if (NULL == __initialPthread.p) {
-        __initialPthread.p = me.p;
-        __initialPthread.x = me.x;
+    if (NULL == __initialPthread) {
+        __initialPthread = me;
     }
     return (pthread_equal(__initialPthread, me));
 }
@@ -577,8 +588,7 @@ CF_PRIVATE void __CFFinalizeWindowsThreadData() {
     __CFTSDFinalize(TlsGetValue(__CFTSDIndexKey));
 }
 
-#endif
-
+#else
 static pthread_key_t __CFTSDIndexKey;
 static pthread_once_t __CFTSDIndexKey_once = PTHREAD_ONCE_INIT;
 
@@ -589,6 +599,7 @@ CF_PRIVATE void __CFTSDInitializeOnce() {
 CF_PRIVATE void __CFTSDInitialize() {
     (void)pthread_once(&__CFTSDIndexKey_once, __CFTSDInitializeOnce);
 }
+#endif
 
 static void __CFTSDSetSpecific(void *arg) {
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
@@ -610,7 +621,7 @@ static void *__CFTSDGetSpecific() {
 #endif
 }
 
-CF_PRIVATE _Atomic(bool) __CFMainThreadHasExited;
+CF_PRIVATE _Atomic(bool) __CFMainThreadHasExited = false;
 static void __CFTSDFinalize(void *arg) {
     if (pthread_main_np()) {
         __CFMainThreadHasExited = true;
@@ -663,7 +674,9 @@ static __CFTSDTable *__CFTSDGetTable(const Boolean create) {
         // This memory is freed in the finalize function
         table = (__CFTSDTable *)calloc(1, sizeof(__CFTSDTable));
         // Windows and Linux have created the table already, we need to initialize it here for other platforms. On Windows, the cleanup function is called by DllMain when a thread exits. On Linux the destructor is set at init time.
+#if (DEPLOYMENT_TARGET_LINUX || DEPLOYMENT_TARGET_MACOSX) && DEPLOYMENT_RUNTIME_SWIFT
         __CFTSDInitialize();
+#endif
         __CFTSDSetSpecific(table);
     }
     
@@ -725,6 +738,7 @@ CF_EXPORT void *_CFSetTSD(uint32_t slot, void *newVal, tsdDestructor destructor)
 /* On Windows, we want to use UTF-16LE for path names to get full unicode support. Internally, however, everything remains in UTF-8 representation. These helper functions stand between CF and the Microsoft CRT to ensure that we are using the right representation on both sides. */
 
 #include <sys/stat.h>
+
 #include <share.h>
 
 // Creates a buffer of wchar_t to hold a UTF16LE version of the UTF8 str passed in. Caller must free the buffer when done. If resultLen is non-NULL, it is filled out with the number of characters in the string.
@@ -857,7 +871,7 @@ CF_EXPORT int _NS_rename(const char *oldName, const char *newName) {
 CF_EXPORT int _NS_open(const char *name, int oflag, int pmode) {
     wchar_t *wide = createWideFileSystemRepresentation(name, NULL);
     int fd;
-    _wsopen_s(&fd, wide, oflag, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+    _wsopen_s(&fd, wide, oflag | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
     free(wide);
     return fd;
 }
@@ -1073,7 +1087,7 @@ CF_PRIVATE int _NS_gettimeofday(struct timeval *tv, struct timezone *tz) {
         t /= 10;
         
         // Difference between 1/1/1970 and 1/1/1601
-        t -= 11644473600000000Ui64;
+        t -= 11644473600000000ULL;
         
         // Convert microseconds to seconds
         tv->tv_sec = (long)(t / 1000000UL);
@@ -1085,6 +1099,32 @@ CF_PRIVATE int _NS_gettimeofday(struct timeval *tv, struct timezone *tz) {
 }
 
 #endif // DEPLOYMENT_TARGET_WINDOWS
+
+#if TARGET_OS_WINDOWS
+CF_EXPORT int fsync(int fd)
+{
+    // If the function FlushFileBuffers succeeds, the return value is nonzero.
+    if (FlushFileBuffers(_get_osfhandle(fd)) == 0)
+        return -1;
+    return 0;
+}
+
+CF_EXPORT int pipe(int pipefd[2])
+{
+    int fd[2];
+    int ret = _pipe(fd, 4096, _O_BINARY);
+    if (ret != 0)
+	return -1;
+    pipefd[0] = fd[0];
+    pipefd[1] = fd[1];
+    return 0;
+}
+
+CF_EXPORT int fchmod(int fd, mode_t mode)
+{
+    return -1;
+}
+#endif
 
 #pragma mark -
 #pragma mark Linux OSAtomic
@@ -1187,6 +1227,7 @@ CF_INLINE _CF_sema_t _CF_get_thread_semaphore() {
     _CF_sema_t s = (_CF_sema_t)pthread_getspecific(key);
     if (s == NULL) {
         s = malloc(sizeof(struct _CF_sema_s));
+        sem_init(&s->sema, 0, 0);
         pthread_setspecific(key, s);
     }
     return s;
@@ -1354,7 +1395,7 @@ int _CFOpenFileWithMode(const char *path, int opts, mode_t mode) {
     return open(path, opts, mode);
 }
 int _CFOpenFile(const char *path, int opts) {
-    return open(path, opts);
+    return open(path, opts, 0);
 }
 
 void *_CFReallocf(void *ptr, size_t size) {

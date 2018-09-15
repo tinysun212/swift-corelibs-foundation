@@ -12,8 +12,10 @@ import CoreFoundation
 
 #if os(OSX) || os(iOS)
     import Darwin.uuid
-#elseif os(Linux) || CYGWIN
+#elseif os(Linux)
     import Glibc
+#elseif os(Cygwin)
+    import Newlib
 #endif
 
 open class NSUUID : NSObject, NSCopying, NSSecureCoding, NSCoding {

@@ -28,14 +28,14 @@
 #if TARGET_OS_WIN32
 #define _CRT_SECURE_NO_WARNINGS 1
 #include <windows.h>
-static __inline bool OSAtomicCompareAndSwapLong(long oldl, long newl, long volatile *dst) 
+bool OSAtomicCompareAndSwapLong(long oldl, long newl, long volatile *dst) 
 { 
     // fixme barrier is overkill -- see objc-os.h
     long original = InterlockedCompareExchange(dst, newl, oldl);
     return (original == oldl);
 }
 
-static __inline bool OSAtomicCompareAndSwapInt(int oldi, int newi, int volatile *dst) 
+bool OSAtomicCompareAndSwapInt(int oldi, int newi, int volatile *dst) 
 { 
     // fixme barrier is overkill -- see objc-os.h
     int original = InterlockedCompareExchange(dst, newi, oldi);

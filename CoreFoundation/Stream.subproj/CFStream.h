@@ -17,7 +17,9 @@
 #include <CoreFoundation/CFRunLoop.h>
 #include <CoreFoundation/CFSocket.h>
 #include <CoreFoundation/CFError.h>
+#if __HAS_DISPATCH__
 #include <dispatch/dispatch.h>
+#endif
 
 CF_IMPLICIT_BRIDGING_ENABLED
 CF_EXTERN_C_BEGIN
@@ -245,6 +247,7 @@ void CFReadStreamUnscheduleFromRunLoop(CFReadStreamRef stream, CFRunLoopRef runL
 CF_EXPORT
 void CFWriteStreamUnscheduleFromRunLoop(CFWriteStreamRef stream, CFRunLoopRef runLoop, CFRunLoopMode runLoopMode);
 
+#if __HAS_DISPATCH__
 
 /*
  * Specify the dispatch queue upon which the client callbacks will be invoked.
@@ -270,6 +273,7 @@ dispatch_queue_t CFReadStreamCopyDispatchQueue(CFReadStreamRef stream) API_AVAIL
 CF_EXPORT
 dispatch_queue_t CFWriteStreamCopyDispatchQueue(CFWriteStreamRef stream) API_AVAILABLE(macos(10.9), ios(7.0), watchos(2.0), tvos(9.0));
 
+#endif
 
 /* The following API is deprecated starting in 10.5; please use CFRead/WriteStreamCopyError(), above, instead */
 typedef CF_ENUM(CFIndex, CFStreamErrorDomain) {

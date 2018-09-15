@@ -350,10 +350,10 @@ CFBurstTrieRef CFBurstTrieCreateFromFile(CFStringRef path) {
     /* Check if file exists */
     if (stat(filename, &sb) != 0) return NULL;
 
-    /* Check if file can be opened */
-    if ((fd=open(filename, CF_OPENFLGS|O_RDONLY)) < 0) return NULL;
-    
 #if DEPLOYMENT_TARGET_WINDOWS
+    /* Check if file can be opened */
+    if ((fd=open(filename, CF_OPENFLGS|O_RDONLY, 0)) < 0) return NULL;
+    
     HANDLE mappedFileHandle = (HANDLE)_get_osfhandle(fd);   
     if (!mappedFileHandle) return NULL;
     
@@ -363,6 +363,9 @@ CFBurstTrieRef CFBurstTrieCreateFromFile(CFStringRef path) {
     char *map = (char *)MapViewOfFile(mapHandle, FILE_MAP_READ, 0, 0, sb.st_size);
     if (!map) return NULL;
 #else            
+    /* Check if file can be opened */
+    if ((fd=open(filename, CF_OPENFLGS|O_RDONLY)) < 0) return NULL;
+    
     char *map = mmap(0, sb.st_size, PROT_READ, MAP_FILE|MAP_SHARED, fd, 0);
 #endif
     

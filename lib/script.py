@@ -88,7 +88,7 @@ TARGET_BOOTSTRAP_DIR  = """ + Configuration.current.bootstrap_directory.relative
 """
 
         c_flags = """
-TARGET_CFLAGS         = -fcolor-diagnostics -fdollars-in-identifiers -fblocks -fobjc-runtime=macosx-10.11 -fintegrated-as -fPIC --target=${TARGET} """
+TARGET_CFLAGS         = -fcolor-diagnostics -fdollars-in-identifiers -fblocks -fobjc-runtime=macosx-10.11 -fintegrated-as --target=${TARGET} """
 
         if Configuration.current.build_mode == Configuration.Debug:
             c_flags += "-g -O0 "
@@ -168,53 +168,53 @@ AR_FLAGS              = rcs
 
         cp_command = """
 rule Cp
-    command = mkdir -p `dirname $out`; /bin/cp -r $in $out
+    command = sh -c 'mkdir -p `dirname $out`; /bin/cp -r $in $out'
     description = Cp $in
 """
 
         compilec_command = """
 rule CompileC
-    command = mkdir -p `dirname $out`; ${CLANG} ${TARGET_CFLAGS} $flags ${VERBOSE_FLAGS} -c $in -o $out 
+    command = sh -c 'mkdir -p `dirname $out`; ${CLANG} ${TARGET_CFLAGS} $flags ${VERBOSE_FLAGS} -c $in -o $out'
     description = CompileC: $in
 
 rule CompileCxx
-    command = mkdir -p `dirname $out`; ${CLANGXX} ${TARGET_CFLAGS} ${TARGET_CXXFLAGS} $flags ${VERBOSE_FLAGS} -c $in -o $out 
+    command = sh -c 'mkdir -p `dirname $out`; ${CLANGXX} ${TARGET_CFLAGS} ${TARGET_CXXFLAGS} $flags ${VERBOSE_FLAGS} -c $in -o $out'
     description = CompileCxx: $in
 """
 
         swiftc_command = """
 rule CompileSwift
-    command = mkdir -p `dirname $out`; mkdir -p ${MODULE_CACHE_PATH}; ${SWIFT} -frontend -c $module_sources ${TARGET_SWIFTCFLAGS} $flags -module-name $module_name -module-link-name $module_name -o $out -emit-module-path $out.~partial.swiftmodule -emit-module-doc-path $out.~partial.swiftdoc -emit-dependencies-path $out.d -emit-reference-dependencies-path $out.swiftdeps -module-cache-path ${MODULE_CACHE_PATH}
+    command = sh -c 'mkdir -p `dirname $out`; mkdir -p ${MODULE_CACHE_PATH}; ${SWIFT} -frontend -c $module_sources ${TARGET_SWIFTCFLAGS} $flags -module-name $module_name -module-link-name $module_name -o $out -emit-module-path $out.~partial.swiftmodule -emit-module-doc-path $out.~partial.swiftdoc -emit-dependencies-path $out.d -emit-reference-dependencies-path $out.swiftdeps -module-cache-path ${MODULE_CACHE_PATH}'
     description = CompileSwift: $in
     depfile = $out.d
 
 rule MergeSwiftModule
-    command = mkdir -p `dirname $out`; ${SWIFT} -frontend -sil-merge-partial-modules -emit-module $partials ${TARGET_SWIFTCFLAGS} $flags -module-cache-path ${MODULE_CACHE_PATH} -module-link-name $module_name -o $out
+    command = sh -c 'mkdir -p `dirname $out`; ${SWIFT} -frontend -sil-merge-partial-modules -emit-module $partials ${TARGET_SWIFTCFLAGS} $flags -module-cache-path ${MODULE_CACHE_PATH} -module-link-name $module_name -o $out'
     description = Merge $out
 """
 
         assembler_command = """
 rule Assemble
-    command = mkdir -p `dirname $out`; ${CLANG} -x assembler-with-cpp -c $in -o $out ${TARGET_CFLAGS} $flags ${VERBOSE_FLAGS} 
+    command = sh -c 'mkdir -p `dirname $out`; ${CLANG} -x assembler-with-cpp -c $in -o $out ${TARGET_CFLAGS} $flags ${VERBOSE_FLAGS}'
     description = Assemble: $in
 """
 
         link_command = """
 rule Link
-    command = mkdir -p `dirname $out`; ${CLANG} ${TARGET_LDFLAGS} ${VERBOSE_FLAGS} $start $in $end $flags -o $out""" 
+    command = sh -c 'mkdir -p `dirname $out`; ${CLANG} ${TARGET_LDFLAGS} ${VERBOSE_FLAGS} $start $in $end $flags -o $out' """
         if Configuration.current.verbose:
             link_command += "-Xlinker --verbose"
         link_command += """
     description = Link: $out
 
 rule Archive
-    command = mkdir -p `dirname $out`; ${AR} ${AR_FLAGS} $out $in
+    command = sh -c 'mkdir -p `dirname $out`; ${AR} ${AR_FLAGS} $out $in'
     description = Archive: $out
 """
         
         swift_build_command = """
 rule SwiftExecutable
-    command = mkdir -p `dirname $out`; ${SWIFTC} ${TARGET_SWIFTEXE_FLAGS} ${EXTRA_LD_FLAGS} $flags $in -o $out
+    command = sh -c 'mkdir -p `dirname $out`; ${SWIFTC} ${TARGET_SWIFTEXE_FLAGS} ${EXTRA_LD_FLAGS} $flags $in -o $out'
     description = SwiftExecutable: $out
 """
 

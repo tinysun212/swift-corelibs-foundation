@@ -31,6 +31,9 @@ CF_INLINE unsigned long __CFPageSize() {
     GetSystemInfo(&sysInfo);
     return sysInfo.dwPageSize;
 }
+unsigned long CFPageSize() {
+    return __CFPageSize();
+}
 #elif DEPLOYMENT_TARGET_LINUX
 #include <unistd.h>
 CF_INLINE unsigned long __CFPageSize() {

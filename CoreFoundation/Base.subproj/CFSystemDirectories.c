@@ -51,6 +51,19 @@ CFSearchPathEnumerationState __CFGetNextSearchPathEnumeration(CFSearchPathEnumer
 
 #endif
 
+#if DEPLOYMENT_TARGET_WINDOWS
+CFSearchPathEnumerationState __CFStartSearchPathEnumeration(CFSearchPathDirectory dir, CFSearchPathDomainMask domainMask) {
+    CFSearchPathEnumerationState result;
+    // Not implemented
+    return result;
+}
+
+CFSearchPathEnumerationState __CFGetNextSearchPathEnumeration(CFSearchPathEnumerationState state, uint8_t *path, CFIndex pathSize) {
+    CFSearchPathEnumerationState result;
+    // Not implemented
+    return result;
+}
+#endif
 
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_WINDOWS
 
