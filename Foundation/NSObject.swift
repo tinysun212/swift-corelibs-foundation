@@ -10,7 +10,7 @@
 // @_exported import of Dispatch here makes it available to all
 // classes in Foundation and all sources that import Foundation.
 // This brings it into line with Darwin usage for compatbility.
-@_exported import Dispatch
+//@_exported import Dispatch
 
 import CoreFoundation
 

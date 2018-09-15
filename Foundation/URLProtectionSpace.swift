@@ -251,6 +251,7 @@ open class URLProtectionSpace : NSObject, NSSecureCoding, NSCopying {
     }
 }
 
+#if !CAN_IMPORT_MINGWCRT && !os(Cygwin)
 extension URLProtectionSpace {
     //an internal helper to create a URLProtectionSpace from a HTTPURLResponse 
     static func create(using response: HTTPURLResponse) -> URLProtectionSpace {
@@ -268,6 +269,7 @@ extension URLProtectionSpace {
         return URLProtectionSpace(host: host, port: port, protocol: _protocol, realm: realm, authenticationMethod: authMethod)
     }
 }
+#endif
 
 extension URLProtectionSpace {
     

@@ -276,7 +276,7 @@ open class Thread : NSObject {
         let maxSupportedStackDepth = 128;
         let addrs = UnsafeMutablePointer<UnsafeMutableRawPointer?>.allocate(capacity: maxSupportedStackDepth)
         defer { addrs.deallocate(capacity: maxSupportedStackDepth) }
-#if os(Android)
+#if os(Android) || CAN_IMPORT_MINGWCRT
         let count = 0
 #else
         let count = backtrace(addrs, Int32(maxSupportedStackDepth))
@@ -294,7 +294,7 @@ open class Thread : NSObject {
     }
 
     open class var callStackSymbols: [String] {
-#if os(Android)
+#if os(Android) || CAN_IMPORT_MINGWCRT
         return []
 #else
         return backtraceAddresses({ (addrs, count) in

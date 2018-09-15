@@ -30,6 +30,14 @@
 #include <math.h>
 #include <limits.h>
 
+#ifndef CF_SWIFT_EXPORT
+#if DEPLOYMENT_RUNTIME_SWIFT
+#define CF_SWIFT_EXPORT extern
+#else
+#define CF_SWIFT_EXPORT static __attribute__((used))
+#endif
+#endif
+
 #define _CF_EXPORT_SCOPE_BEGIN \
 CF_EXTERN_C_BEGIN \
 CF_ASSUME_NONNULL_BEGIN \

@@ -447,7 +447,7 @@ open class NSURL : NSObject, NSSecureCoding, NSCopying {
         }
         super.init()
 #if os(Windows)
-        _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLWindowsPathStyle, isDir, nil)
+        _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLWindowsPathStyle, isDir.boolValue, nil)
 #else
         _CFURLInitWithFileSystemPathRelativeToBase(_cfObject, thePath._cfObject, kCFURLPOSIXPathStyle, isDir.boolValue, nil)
 #endif

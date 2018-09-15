@@ -409,6 +409,15 @@ open class FileManager : NSObject {
         result[.systemNumber] = NSNumber(value: UInt64(s.st_dev))
         result[.systemFileNumber] = NSNumber(value: UInt64(s.st_ino))
         
+#if CAN_IMPORT_MINGWCRT
+        var type : FileAttributeType
+        switch Int32(s.st_mode) & S_IFMT {
+            case S_IFCHR: type = .typeCharacterSpecial
+            case S_IFDIR: type = .typeDirectory
+            case S_IFREG: type = .typeRegular
+            default: type = .typeUnknown
+        }
+#else
         if let pwd = getpwuid(s.st_uid), pwd.pointee.pw_name != nil {
             let name = String(cString: pwd.pointee.pw_name)
             result[.ownerAccountName] = name
@@ -419,15 +428,6 @@ open class FileManager : NSObject {
             result[.groupOwnerAccountName] = name
         }
 
-#if CAN_IMPORT_MINGWCRT
-        var type : FileAttributeType
-        switch Int32(s.st_mode) & S_IFMT {
-            case S_IFCHR: type = .typeCharacterSpecial
-            case S_IFDIR: type = .typeDirectory
-            case S_IFREG: type = .typeRegular
-            default: type = .typeUnknown
-        }
-#else
         var type : FileAttributeType
         switch s.st_mode & S_IFMT {
             case S_IFCHR: type = .typeCharacterSpecial
@@ -465,7 +465,7 @@ open class FileManager : NSObject {
         This method replaces fileSystemAttributesAtPath:.
      */
     open func attributesOfFileSystem(forPath path: String) throws -> [FileAttributeKey : Any] {
-#if os(Android)
+#if os(Android) || CAN_IMPORT_MINGWCRT
         NSUnimplemented()
 #else
         // statvfs(2) doesn't support 64bit inode on Darwin (apfs), fallback to statfs(2)
@@ -757,7 +757,7 @@ open class FileManager : NSObject {
             }) {
 
             if let isDirectory = isDirectory {
-                isDirectory.pointee = (Int32(s.st_mode) & S_IFMT) == S_IFDIR
+                isDirectory.pointee = ObjCBool((Int32(s.st_mode) & S_IFMT) == S_IFDIR)
             }
 
         } else {

@@ -22,7 +22,7 @@ import CoreFoundation
 @_exported import MinGWCrt
 #endif
 
-@_exported import Dispatch
+//@_exported import Dispatch
 
 #if os(Android) || CAN_IMPORT_MINGWCRT // shim required for bzero
 @_transparent func bzero(_ ptr: UnsafeMutableRawPointer, _ size: size_t) {

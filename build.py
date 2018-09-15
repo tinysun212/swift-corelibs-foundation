@@ -56,7 +56,7 @@ elif Configuration.current.target.sdk == OSType.Win32 and Configuration.current.
 	foundation.CFLAGS = '-DDEPLOYMENT_TARGET_WINDOWS -D_GNU_SOURCE -mcmodel=large -I/mingw64/include/libxml2 -I/mingw64/include/curl '
 	foundation.LDFLAGS = '${SWIFT_USE_LINKER} -lswiftMinGwCrt `icu-config --ldflags` -Wl,-defsym,__CFConstantStringClassReference=_T010Foundation19_NSCFConstantStringCN,--allow-multiple-definition '
 	swift_cflags += [
-		'-DMINGW',
+		'-Xcc -DCF_BUILDING_CF',
 		'-DCAN_IMPORT_MINGWCRT',
 		'-I${BUILD_DIR}/Foundation/usr/lib/swift',
 		'-I/mingw64/include',
@@ -143,6 +143,8 @@ else:
 triple = Configuration.current.target.triple
 if triple == "armv7-none-linux-androideabi":
 	foundation.LDFLAGS += '-llog '
+elif triple == "x86_64-windows-gnu":
+	foundation.LDFLAGS += '-lws2_32 -lrpcrt4 -lpthread -Xlinker -export-all-symbols '
 else:
 	foundation.LDFLAGS += '-lpthread '
 
@@ -471,7 +473,7 @@ swift_sources = CompileSwiftSources([
 	'Foundation/URLProtectionSpace.swift',
 	#'Foundation/URLProtocol.swift',
 	#'Foundation/NSURLRequest.swift',
-	#'Foundation/URLResponse.swift',
+	'Foundation/URLResponse.swift',
 	#'Foundation/URLSession/Configuration.swift',
 	#'Foundation/URLSession/libcurl/EasyHandle.swift',
 	#'Foundation/URLSession/BodySource.swift',
@@ -504,7 +506,7 @@ swift_sources = CompileSwiftSources([
 	'Foundation/Date.swift',
 	'Foundation/Data.swift',
 	'Foundation/CharacterSet.swift',
-	'Foundation/URLRequest.swift',
+	#'Foundation/URLRequest.swift',
 	'Foundation/PersonNameComponents.swift',
 	'Foundation/Notification.swift',
 	'Foundation/URLComponents.swift',

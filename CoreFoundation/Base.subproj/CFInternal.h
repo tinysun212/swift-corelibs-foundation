@@ -93,7 +93,7 @@ CF_EXTERN_C_BEGIN
 #include <CoreFoundation/CFRuntime.h>
 #include <limits.h>
 #include <stdatomic.h>
-#include <Block.h>
+//#include <Block.h>
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI || DEPLOYMENT_TARGET_LINUX || DEPLOYMENT_TARGET_FREEBSD
 #if TARGET_OS_CYGWIN
 #else
@@ -691,6 +691,7 @@ CF_PRIVATE CFArrayRef _CFCreateCFArrayByTokenizingString(const char *values, cha
 
 #if __BLOCKS__
 #if DEPLOYMENT_TARGET_WINDOWS
+#define DT_UNKNOWN	 0
 #define	DT_DIR		 4
 #define	DT_REG		 8
 #define DT_LNK          10
