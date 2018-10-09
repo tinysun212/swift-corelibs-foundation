@@ -63,9 +63,15 @@ internal extension String {
         // Find the beginning of the component
         while curPos > startPos {
             let prevPos = index(before: curPos)
+#if os(Windows)
+            if self[prevPos] == "/" || self[prevPos] == "\\" {
+                break
+            }
+#else
             if self[prevPos] == "/" {
                 break
             }
+#endif
             curPos = prevPos
         }
         return curPos
